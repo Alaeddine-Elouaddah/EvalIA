@@ -1,0 +1,109 @@
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+.brand {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.card {
+  margin-top: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+input[type='file'],
+input[type='number'] {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  color: var(--ko);
+  margin: 0;
+}
+
+.hint,
+.meta {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.options button {
+  width: 100%;
+  text-align: left;
+  background: #f3f4f8;
+  color: var(--text-h);
+}
+
+.options button.ok {
+  background: #d3f9d8;
+}
+
+.options button.ko {
+  background: #ffe3e3;
+}
+
+.explain {
+  margin: 0;
+  padding: 12px;
+  background: #f8f6ff;
+  border-radius: 8px;
+}
+
+.recap {
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.recap p {
+  margin: 6px 0 0;
+}
