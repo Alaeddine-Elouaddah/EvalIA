@@ -1,179 +1,80 @@
-import { useState, type FormEvent } from 'react'
-import { generateQcm } from './api/qcm'
-import type { GeneratedQuestion, Step } from './types'
-import './App.css'
+import { useState, useEffect } from 'react'
+import type { AppView, User } from './types'
+import { getStoredUser, clearAuthSession } from './api/auth'
+import { Navbar } from './components/Navbar'
+import { HomePage } from './components/HomePage'
+import { LoginPage } from './components/LoginPage'
+import { RegisterPage } from './components/RegisterPage'
+import { QcmWorkspace } from './components/QcmWorkspace'
 
 function App() {
-  const [step, setStep] = useState<Step>('upload')
-  const [file, setFile] = useState<File | null>(null)
-  const [nb, setNb] = useState(3)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [questions, setQuestions] = useState<GeneratedQuestion[]>([])
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState<number[]>([])
-  const [picked, setPicked] = useState<number | null>(null)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [currentView, setCurrentView] = useState<AppView>('home')
 
-  async function onGenerate(e: FormEvent) {
-    e.preventDefault()
-    if (!file) {
-      setError('Choisis un fichier PDF.')
-      return
+  useEffect(() => {
+    const user = getStoredUser()
+    if (user) {
+      setCurrentUser(user)
     }
-    setLoading(true)
-    setError(null)
-    try {
-      const qcms = await generateQcm(file, nb)
-      if (qcms.length === 0) {
-        throw new Error("L'IA n'a renvoyé aucune question.")
-      }
-      setQuestions(qcms)
-      setIndex(0)
-      setAnswers([])
-      setPicked(null)
-      setStep('quiz')
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
-      if (msg.includes('503') || msg.includes('UNAVAILABLE')) {
-        setError("Le service d'IA subit une forte demande momentanée. Veuillez patienter quelques secondes et cliquer à nouveau sur Générer.")
-      } else if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
-        setError("Le quota de requêtes vers l'IA a été atteint. Veuillez réessayer un peu plus tard.")
-      } else {
-        setError(msg)
-      }
-    } finally {
-      setLoading(false)
-    }
+  }, [])
+
+  function handleAuthSuccess(user: User) {
+    setCurrentUser(user)
+    setCurrentView('generator')
   }
 
-  function choose(optionIndex: number) {
-    if (picked !== null) return
-    setPicked(optionIndex)
+  function handleLogout() {
+    clearAuthSession()
+    setCurrentUser(null)
+    setCurrentView('home')
   }
-
-  function next() {
-    if (picked === null) return
-    const nextAnswers = [...answers, picked]
-    setAnswers(nextAnswers)
-    setPicked(null)
-    if (index + 1 < questions.length) {
-      setIndex(index + 1)
-    } else {
-      setStep('result')
-    }
-  }
-
-  function reset() {
-    setStep('upload')
-    setQuestions([])
-    setAnswers([])
-    setIndex(0)
-    setPicked(null)
-    setError(null)
-  }
-
-  const current = questions[index]
-  const score = answers.filter((a, i) => a === questions[i]?.correctIndex).length
 
   return (
-    <div className="page">
-      <header>
-        <p className="brand">EvalIA</p>
-        <h1>Générer un QCM depuis un PDF</h1>
-      </header>
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
+      <Navbar
+        user={currentUser}
+        currentView={currentView}
+        onNavigate={(view) => setCurrentView(view)}
+        onLogout={handleLogout}
+      />
 
-      {step === 'upload' && (
-        <form className="card" onSubmit={onGenerate}>
-          <label>
-            Fichier PDF
-            <input
-              type="file"
-              accept="application/pdf,.pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {currentView === 'home' && (
+          <HomePage
+            user={currentUser}
+            onNavigate={(view) => setCurrentView(view)}
+          />
+        )}
+
+        {currentView === 'login' && (
+          <LoginPage
+            onSuccess={handleAuthSuccess}
+            onNavigate={(view) => setCurrentView(view)}
+          />
+        )}
+
+        {currentView === 'register' && (
+          <RegisterPage
+            onSuccess={handleAuthSuccess}
+            onNavigate={(view) => setCurrentView(view)}
+          />
+        )}
+
+        {currentView === 'generator' && (
+          currentUser ? (
+            <QcmWorkspace user={currentUser} />
+          ) : (
+            <LoginPage
+              onSuccess={handleAuthSuccess}
+              onNavigate={(view) => setCurrentView(view)}
             />
-          </label>
-          <label>
-            Nombre de questions
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={nb}
-              onChange={(e) => setNb(Number(e.target.value))}
-            />
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={loading}>
-            {loading ? 'Génération en cours…' : 'Générer'}
-          </button>
-          {loading && (
-            <p className="hint">Gemini peut mettre 10 à 40 secondes, parfois plus.</p>
-          )}
-        </form>
-      )}
+          )
+        )}
+      </main>
 
-      {step === 'quiz' && current && (
-        <section className="card">
-          <p className="meta">
-            Question {index + 1} / {questions.length}
-          </p>
-          <h2>{current.question}</h2>
-          <ul className="options">
-            {current.options.map((opt, i) => {
-              const correct = i === current.correctIndex
-              const selected = picked === i
-              let cls = ''
-              if (picked !== null) {
-                if (correct) cls = 'ok'
-                else if (selected) cls = 'ko'
-              }
-              return (
-                <li key={opt}>
-                  <button
-                    type="button"
-                    className={cls}
-                    disabled={picked !== null}
-                    onClick={() => choose(i)}
-                  >
-                    {opt}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-          {picked !== null && (
-            <>
-              <p className="explain">{current.explanation}</p>
-              <button type="button" onClick={next}>
-                {index + 1 < questions.length ? 'Question suivante' : 'Voir le score'}
-              </button>
-            </>
-          )}
-        </section>
-      )}
-
-      {step === 'result' && (
-        <section className="card">
-          <h2>
-            Score : {score} / {questions.length}
-          </h2>
-          <ol className="recap">
-            {questions.map((q, i) => (
-              <li key={q.question}>
-                <strong>{q.question}</strong>
-                <p>
-                  Ta réponse : {q.options[answers[i] ?? 0]}
-                  {answers[i] === q.correctIndex ? ' ✓' : ' ✗'}
-                </p>
-                <p className="explain">{q.explanation}</p>
-              </li>
-            ))}
-          </ol>
-          <button type="button" onClick={reset}>
-            Nouveau PDF
-          </button>
-        </section>
-      )}
+      <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-400 bg-white">
+        EvalIA &copy; 2026 - Plateforme intelligente de génération de QCM et d'évaluation académique (JWT & PostgreSQL)
+      </footer>
     </div>
   )
 }

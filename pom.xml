@@ -5,13 +5,78 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>ma.ensiasd</groupId>
-    <artifactId>EvalIA</artifactId>
+    <artifactId>evalia</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release>21</maven.compiler.release>
+        <failOnMissingWebXml>false</failOnMissingWebXml>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-    
+
+    <dependencies>
+        <dependency>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-api</artifactId>
+            <version>10.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+        <!-- PostgreSQL JDBC Driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.3</version>
+        </dependency>
+        <!-- JJWT for JWT generation and verification -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- BCrypt for password hashing -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>evalia</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.wildfly.plugins</groupId>
+                <artifactId>wildfly-maven-plugin</artifactId>
+                <version>5.0.1.Final</version>
+                <configuration>
+                    <feature-packs>
+                        <feature-pack>
+                            <location>wildfly@maven(org.jboss.universe:community-universe)#34.0.0.Final</location>
+                        </feature-pack>
+                    </feature-packs>
+                    <layers>
+                        <layer>jaxrs-server</layer>
+                    </layers>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
