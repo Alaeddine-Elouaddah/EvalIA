@@ -1,0 +1,26 @@
+{
+  "title": "Examen Test Algorithmique",
+  "description": "Evaluation sur les tris",
+  "questions": [
+    {
+      "question": "Quelle est la complexite du tri fusion ?",
+      "questionType": "SINGLE",
+      "explanation": "O(n log n) dans tous les cas.",
+      "options": [
+        { "optionText": "O(n log n)", "correct": true },
+        { "optionText": "O(n^2)", "correct": false },
+        { "optionText": "O(n)", "correct": false }
+      ]
+    },
+    {
+      "question": "Lesquels de ces algorithmes sont stables ?",
+      "questionType": "MULTIPLE",
+      "explanation": "Tri par insertion et tri fusion sont stables.",
+      "options": [
+        { "optionText": "Tri par insertion", "correct": true },
+        { "optionText": "Tri fusion", "correct": true },
+        { "optionText": "Tri par tas", "correct": false }
+      ]
+    }
+  ]
+}

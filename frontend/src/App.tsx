@@ -6,6 +6,7 @@ import { HomePage } from './components/HomePage'
 import { LoginPage } from './components/LoginPage'
 import { RegisterPage } from './components/RegisterPage'
 import { QcmWorkspace } from './components/QcmWorkspace'
+import { TeacherDashboard } from './components/TeacherDashboard'
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null)
@@ -20,7 +21,11 @@ function App() {
 
   function handleAuthSuccess(user: User) {
     setCurrentUser(user)
-    setCurrentView('generator')
+    if (user.role === 'TEACHER') {
+      setCurrentView('teacher_dashboard')
+    } else {
+      setCurrentView('generator')
+    }
   }
 
   function handleLogout() {
@@ -60,6 +65,17 @@ function App() {
           />
         )}
 
+        {currentView === 'teacher_dashboard' && (
+          currentUser && currentUser.role === 'TEACHER' ? (
+            <TeacherDashboard />
+          ) : (
+            <HomePage
+              user={currentUser}
+              onNavigate={(view) => setCurrentView(view)}
+            />
+          )
+        )}
+
         {currentView === 'generator' && (
           currentUser ? (
             <QcmWorkspace user={currentUser} />
@@ -73,7 +89,7 @@ function App() {
       </main>
 
       <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-400 bg-white">
-        EvalIA &copy; 2026 - Plateforme intelligente de génération de QCM et d'évaluation académique (JWT & PostgreSQL)
+        EvalIA &copy; 2026 - Plateforme d'évaluation académique & QCM (Enseignants & Étudiants - JWT & PostgreSQL)
       </footer>
     </div>
   )

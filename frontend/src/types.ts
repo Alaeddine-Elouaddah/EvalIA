@@ -23,4 +23,31 @@ export interface GeneratedQuestion {
   explanation: string
 }
 
-export type AppView = 'home' | 'login' | 'register' | 'generator'
+export type QuestionType = 'SINGLE' | 'MULTIPLE'
+
+export interface QuestionOptionDTO {
+  id?: number
+  optionText: string
+  correct: boolean
+  orderIndex?: number
+}
+
+export interface ExamQuestionDTO {
+  id?: number
+  question: string
+  questionType: QuestionType
+  explanation?: string
+  options: QuestionOptionDTO[]
+}
+
+export interface ExamDTO {
+  id?: number
+  title: string
+  description?: string
+  teacherId?: number
+  teacherName?: string
+  createdAt?: string
+  questions: ExamQuestionDTO[]
+}
+
+export type AppView = 'home' | 'login' | 'register' | 'generator' | 'teacher_dashboard'

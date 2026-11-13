@@ -14,7 +14,7 @@ public class UserRepository {
     }
 
     public Optional<User> findByEmail(String email) {
-        String sql = "SELECT id, name, email, password, role FROM users WHERE LOWER(email) = LOWER(?)";
+        String sql = "SELECT id, name, email, password, role FROM evalia_users WHERE LOWER(email) = LOWER(?)";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
@@ -39,7 +39,7 @@ public class UserRepository {
         String hashedPassword = BCrypt.hashpw(rawPassword, BCrypt.gensalt(10));
         String formattedRole = "TEACHER".equalsIgnoreCase(role) ? "TEACHER" : "STUDENT";
 
-        String sql = "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?) RETURNING id";
+        String sql = "INSERT INTO evalia_users (name, email, password, role) VALUES (?, ?, ?, ?) RETURNING id";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, name);

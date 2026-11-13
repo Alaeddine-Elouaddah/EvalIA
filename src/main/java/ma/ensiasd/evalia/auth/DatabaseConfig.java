@@ -1,17 +1,21 @@
 package ma.ensiasd.evalia.auth;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Properties;
 
 public class DatabaseConfig {
 
-    private static final String URL = System.getenv().getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/evalia");
-    private static final String USER = System.getenv().getOrDefault("DB_USER", "postgres");
-    private static final String PASSWORD = System.getenv().getOrDefault("DB_PASSWORD", "postgres");
+    private static String url;
+    private static String user;
+    private static String password;
 
     static {
+        loadConfig();
         try {
             Class.forName("org.postgresql.Driver");
         } catch (ClassNotFoundException e) {
@@ -19,13 +23,37 @@ public class DatabaseConfig {
         }
     }
 
+    private static void loadConfig() {
+        Properties props = new Properties();
+
+        // Charger depuis le fichier .env
+        File envFile = new File(".env");
+        if (!envFile.exists()) {
+            envFile = new File("../.env");
+        }
+        if (envFile.exists()) {
+            try (FileInputStream fis = new FileInputStream(envFile)) {
+                props.load(fis);
+            } catch (Exception ignored) {}
+        }
+
+        url = System.getenv("DB_URL");
+        if (url == null) url = props.getProperty("DB_URL", "jdbc:postgresql://localhost:5432/evalia");
+
+        user = System.getenv("DB_USER");
+        if (user == null) user = props.getProperty("DB_USER", "postgres");
+
+        password = System.getenv("DB_PASSWORD");
+        if (password == null) password = props.getProperty("DB_PASSWORD", "alae");
+    }
+
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(URL, USER, PASSWORD);
+        return DriverManager.getConnection(url, user, password);
     }
 
     public static void initDatabase() {
         String sql = """
-            CREATE TABLE IF NOT EXISTS users (
+            CREATE TABLE IF NOT EXISTS evalia_users (
                 id BIGSERIAL PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
                 email VARCHAR(150) UNIQUE NOT NULL,
@@ -37,7 +65,7 @@ public class DatabaseConfig {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
         } catch (SQLException e) {
-            System.err.println("Database auto-init failed or skipped (PostgreSQL not connected yet?): " + e.getMessage());
+            System.err.println("Database auto-init failed or skipped: " + e.getMessage());
         }
     }
 }

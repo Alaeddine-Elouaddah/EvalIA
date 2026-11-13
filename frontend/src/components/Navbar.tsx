@@ -1,6 +1,6 @@
 import React from 'react'
 import type { User, AppView } from '../types'
-import { LogOut, BookOpen, User as UserIcon, Sparkles } from 'lucide-react'
+import { LogOut, BookOpen, User as UserIcon, Sparkles, LayoutDashboard } from 'lucide-react'
 
 interface NavbarProps {
   user: User | null
@@ -37,6 +37,20 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentView, onNavigate, o
             Accueil
           </button>
 
+          {user && user.role === 'TEACHER' && (
+            <button
+              onClick={() => onNavigate('teacher_dashboard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
+                currentView === 'teacher_dashboard'
+                  ? 'text-purple-700 bg-purple-50 font-semibold ring-1 ring-purple-200'
+                  : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50/50'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 text-purple-600" />
+              <span>Tableau de bord Examens</span>
+            </button>
+          )}
+
           {user && (
             <button
               onClick={() => onNavigate('generator')}
@@ -47,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentView, onNavigate, o
               }`}
             >
               <BookOpen className="w-4 h-4" />
-              <span>Générateur QCM</span>
+              <span>Générateur IA</span>
             </button>
           )}
 
