@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import type { AppView, User, UserRole } from '../types'
+import type { AppView, User } from '../types'
 import { registerUser } from '../api/auth'
-import { Lock, Mail, User as UserIcon, GraduationCap, BookOpen, ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
+import { Lock, Mail, User as UserIcon, BookOpen, ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
 
 interface RegisterPageProps {
   onSuccess: (user: User) => void
@@ -12,7 +12,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSuccess, onNavigat
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<UserRole>('STUDENT')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -22,7 +21,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSuccess, onNavigat
     setLoading(true)
 
     try {
-      const res = await registerUser(name, email, password, role)
+      const res = await registerUser(name, email, password)
       onSuccess({
         id: res.id,
         name: res.name,
@@ -41,7 +40,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSuccess, onNavigat
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-slate-900">Créer un compte EvalIA</h2>
-          <p className="text-sm text-slate-500 mt-1">Rejoignez la plateforme et choisissez votre profil</p>
+          <p className="text-sm text-slate-500 mt-1">Créez votre compte étudiant pour rejoindre la plateforme</p>
         </div>
 
         {error && (
@@ -52,38 +51,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSuccess, onNavigat
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Role selector buttons */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-              Je suis un :
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setRole('STUDENT')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-semibold transition cursor-pointer ${
-                  role === 'STUDENT'
-                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <BookOpen className="w-4 h-4 text-emerald-600" />
-                <span>Étudiant</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('TEACHER')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-semibold transition cursor-pointer ${
-                  role === 'TEACHER'
-                    ? 'border-purple-600 bg-purple-50 text-purple-800 ring-2 ring-purple-500/20'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <GraduationCap className="w-4 h-4 text-purple-600" />
-                <span>Enseignant</span>
-              </button>
-            </div>
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+            <BookOpen className="h-4 w-4 text-emerald-600" />
+            <span>Création de compte étudiant</span>
           </div>
 
           <div>
@@ -150,7 +120,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSuccess, onNavigat
               </>
             ) : (
               <>
-                <span>Créer mon compte ({role === 'TEACHER' ? 'Enseignant' : 'Étudiant'})</span>
+                <span>Créer mon compte étudiant</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

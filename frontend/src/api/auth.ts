@@ -1,4 +1,4 @@
-import type { AuthResponse, User, UserRole } from '../types'
+import type { AuthResponse, UpdateUserProfile, User, UserProfile } from '../types'
 
 const TOKEN_KEY = 'evalia_jwt_token'
 const USER_KEY = 'evalia_user_data'
@@ -35,7 +35,7 @@ export function clearAuthSession(): void {
   localStorage.removeItem(USER_KEY)
 }
 
-async function handleResponse(res: Response, defaultError: string): Promise<AuthResponse> {
+async function handleResponse<T>(res: Response, defaultError: string): Promise<T> {
   const text = await res.text()
   let data: any = null
   try {
@@ -58,7 +58,7 @@ async function handleResponse(res: Response, defaultError: string): Promise<Auth
     throw new Error(defaultError)
   }
 
-  return data as AuthResponse
+  return data as T
 }
 
 export async function loginUser(email: string, password: string): Promise<AuthResponse> {
@@ -68,7 +68,7 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
     body: JSON.stringify({ email, password }),
   })
 
-  const auth = await handleResponse(res, 'Identifiants invalides')
+  const auth = await handleResponse<AuthResponse>(res, 'Identifiants invalides')
   saveAuthSession(auth)
   return auth
 }
@@ -76,16 +76,41 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 export async function registerUser(
   name: string,
   email: string,
-  password: string,
-  role: UserRole
+  password: string
 ): Promise<AuthResponse> {
   const res = await fetch('/evalia/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, password, role }),
+    body: JSON.stringify({ name, email, password, role: 'STUDENT' }),
   })
 
-  const auth = await handleResponse(res, "Erreur lors de l'inscription")
+  const auth = await handleResponse<AuthResponse>(res, "Erreur lors de l'inscription")
+  saveAuthSession(auth)
+  return auth
+}
+
+export async function fetchUserProfile(): Promise<UserProfile> {
+  const res = await fetch('/evalia/api/auth/profile', {
+    headers: { Authorization: `Bearer ${getStoredToken()}` },
+  })
+  const data = await handleResponse<UserProfile>(res, 'Erreur lors du chargement du profil')
+  return {
+    name: data.name,
+    email: data.email,
+    profilePhoto: data.profilePhoto ?? null,
+  }
+}
+
+export async function updateUserProfile(profile: UpdateUserProfile): Promise<AuthResponse> {
+  const res = await fetch('/evalia/api/auth/profile', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getStoredToken()}`,
+    },
+    body: JSON.stringify(profile),
+  })
+  const auth = await handleResponse<AuthResponse>(res, 'Erreur lors de la mise à jour du profil')
   saveAuthSession(auth)
   return auth
 }

@@ -3,6 +3,7 @@ package ma.ensiasd.evalia.exam;
 import jakarta.enterprise.context.ApplicationScoped;
 import ma.ensiasd.evalia.auth.DatabaseConfig;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,163 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class ExamRepository {
+
+    public List<ExamSummary> findAvailableExams() {
+        List<ExamSummary> exams = new ArrayList<>();
+        String sql = """
+            SELECT e.id, e.title, e.description, e.teacher_name, e.created_at, COUNT(q.id) AS question_count
+            FROM exams e
+            LEFT JOIN exam_questions q ON q.exam_id = e.id
+            GROUP BY e.id, e.title, e.description, e.teacher_name, e.created_at
+            ORDER BY e.id DESC
+            """;
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                exams.add(new ExamSummary(
+                    rs.getLong("id"),
+                    rs.getString("title"),
+                    rs.getString("description"),
+                    rs.getString("teacher_name"),
+                    rs.getString("created_at"),
+                    rs.getInt("question_count")
+                ));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors du chargement des examens disponibles: " + e.getMessage(), e);
+        }
+        return exams;
+    }
+
+    public ExamAttemptDTO createAttempt(
+            Long examId,
+            Long studentId,
+            String studentName,
+            String studentEmail,
+            int correctCount,
+            int totalQuestions,
+            double score,
+            String examTitle) {
+        String sql = """
+            INSERT INTO exam_attempts (exam_id, student_id, correct_count, total_questions, score)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id, submitted_at
+            """;
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, examId);
+            ps.setLong(2, studentId);
+            ps.setInt(3, correctCount);
+            ps.setInt(4, totalQuestions);
+            ps.setBigDecimal(5, BigDecimal.valueOf(score));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new ExamAttemptDTO(
+                        rs.getLong("id"),
+                        examId,
+                        examTitle,
+                        studentName,
+                        studentEmail,
+                        correctCount,
+                        totalQuestions,
+                        score,
+                        rs.getString("submitted_at")
+                    );
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors de l'enregistrement de la note: " + e.getMessage(), e);
+        }
+        throw new RuntimeException("La tentative n'a pas pu être enregistrée");
+    }
+
+    public List<ExamAttemptDTO> findStudentAttempts(Long studentId) {
+        String sql = """
+            SELECT a.id, a.exam_id, e.title AS exam_title, u.name AS student_name, u.email AS student_email,
+                   a.correct_count, a.total_questions, a.score, a.submitted_at
+            FROM exam_attempts a
+            JOIN exams e ON e.id = a.exam_id
+            JOIN evalia_users u ON u.id = a.student_id
+            WHERE a.student_id = ?
+            ORDER BY a.submitted_at DESC, a.id DESC
+            """;
+        return findAttempts(sql, studentId);
+    }
+
+    public List<ExamAttemptDTO> findTeacherGrades(Long teacherId) {
+        String sql = """
+            SELECT a.id, a.exam_id, e.title AS exam_title, u.name AS student_name, u.email AS student_email,
+                   a.correct_count, a.total_questions, a.score, a.submitted_at
+            FROM exam_attempts a
+            JOIN exams e ON e.id = a.exam_id
+            JOIN evalia_users u ON u.id = a.student_id
+            WHERE e.teacher_id = ?
+            ORDER BY a.submitted_at DESC, a.id DESC
+            """;
+        return findAttempts(sql, teacherId);
+    }
+
+    private List<ExamAttemptDTO> findAttempts(String sql, Long ownerId) {
+        List<ExamAttemptDTO> attempts = new ArrayList<>();
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, ownerId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    attempts.add(new ExamAttemptDTO(
+                        rs.getLong("id"),
+                        rs.getLong("exam_id"),
+                        rs.getString("exam_title"),
+                        rs.getString("student_name"),
+                        rs.getString("student_email"),
+                        rs.getInt("correct_count"),
+                        rs.getInt("total_questions"),
+                        rs.getDouble("score"),
+                        rs.getString("submitted_at")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors du chargement des notes: " + e.getMessage(), e);
+        }
+        return attempts;
+    }
+
+    public List<TeacherStudentDTO> findTeacherStudents(Long teacherId) {
+        List<TeacherStudentDTO> students = new ArrayList<>();
+        String sql = """
+            SELECT u.id, u.name, u.email,
+                   COUNT(a.id) AS attempt_count,
+                   COUNT(DISTINCT a.exam_id) AS exams_taken,
+                   COALESCE(AVG(a.score), 0) AS average_score
+            FROM evalia_users u
+            LEFT JOIN exams e ON e.teacher_id = ?
+            LEFT JOIN exam_attempts a ON a.exam_id = e.id AND a.student_id = u.id
+            WHERE u.role = 'STUDENT'
+            GROUP BY u.id, u.name, u.email
+            ORDER BY u.name, u.id
+            """;
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, teacherId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    students.add(new TeacherStudentDTO(
+                        rs.getLong("id"),
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getLong("attempt_count"),
+                        rs.getLong("exams_taken"),
+                        rs.getDouble("average_score")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors du chargement des étudiants: " + e.getMessage(), e);
+        }
+        return students;
+    }
 
     public Exam createExam(Exam exam) {
         String examSql = "INSERT INTO exams (title, description, teacher_id, teacher_name) VALUES (?, ?, ?, ?) RETURNING id, created_at";

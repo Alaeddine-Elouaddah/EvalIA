@@ -5,6 +5,8 @@ export interface User {
   name: string
   email: string
   role: UserRole
+  profilePhoto?: string | null
+  programId?: string
 }
 
 export interface AuthResponse {
@@ -13,7 +15,22 @@ export interface AuthResponse {
   name: string
   email: string
   role: UserRole
+  profilePhoto?: string | null
   error?: string
+}
+
+export interface UserProfile {
+  name: string
+  email: string
+  profilePhoto: string | null
+}
+
+export interface UpdateUserProfile {
+  name: string
+  email: string
+  currentPassword: string
+  newPassword: string
+  profilePhoto: string | null
 }
 
 export interface GeneratedQuestion {
@@ -50,4 +67,44 @@ export interface ExamDTO {
   questions: ExamQuestionDTO[]
 }
 
-export type AppView = 'home' | 'login' | 'register' | 'generator' | 'teacher_dashboard'
+export interface ExamSummary {
+  id: number
+  title: string
+  description?: string
+  teacherName?: string
+  createdAt?: string
+  questionCount: number
+}
+
+export interface ExamAttemptDTO {
+  id: number
+  examId: number
+  examTitle: string
+  studentName: string
+  studentEmail: string
+  correctCount: number
+  totalQuestions: number
+  score: number
+  submittedAt: string
+}
+
+export interface TeacherStudentDTO {
+  id: number
+  name: string
+  email: string
+  attemptCount: number
+  examsTaken: number
+  averageScore: number
+}
+
+export type AppView =
+  | 'home'
+  | 'login'
+  | 'register'
+  | 'generator'
+  | 'student_exams'
+  | 'teacher_dashboard'
+  | 'teacher_students'
+  | 'teacher_grades'
+  | 'profile'
+  | 'student_join_exam'

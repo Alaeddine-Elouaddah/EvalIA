@@ -6,6 +6,7 @@ public class AuthResponse {
     private String name;
     private String email;
     private String role;
+    private String profilePhoto;
 
     public AuthResponse() {}
 
@@ -55,5 +56,13 @@ public class AuthResponse {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getProfilePhoto() {
+        return profilePhoto;
+    }
+
+    public void setProfilePhoto(String profilePhoto) {
+        this.profilePhoto = profilePhoto;
     }
 }

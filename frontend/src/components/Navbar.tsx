@@ -1,6 +1,6 @@
-import React from 'react'
+import { useState } from 'react'
 import type { User, AppView } from '../types'
-import { LogOut, BookOpen, User as UserIcon, Sparkles, LayoutDashboard } from 'lucide-react'
+import { BookOpen, GraduationCap, KeyRound, LogOut, Menu, Sparkles, UserRound, X } from 'lucide-react'
 
 interface NavbarProps {
   user: User | null
@@ -9,109 +9,66 @@ interface NavbarProps {
   onLogout: () => void
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ user, currentView, onNavigate, onLogout }) => {
+export function Navbar({ user, currentView, onNavigate, onLogout }: NavbarProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  function navigate(view: AppView) {
+    onNavigate(view)
+    setMenuOpen(false)
+  }
+
+  const navClass = (view: AppView) => `flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium transition md:w-auto ${
+    currentView === view ? 'bg-primary-50 text-primary' : 'text-muted hover:bg-canvas hover:text-ink'
+  }`
+
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <button
-          onClick={() => onNavigate('home')}
-          className="flex items-center gap-2 group cursor-pointer"
-        >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-violet-600 bg-clip-text text-transparent">
-            EvalIA
+    <header className="sticky top-0 z-50 border-b border-line bg-surface/95 backdrop-blur">
+      <div className="relative mx-auto flex min-h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <button type="button" onClick={() => navigate(user?.role === 'STUDENT' ? 'generator' : 'home')} aria-label="Retour à EvalIA" className="group flex items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-surface shadow-panel transition-transform group-hover:scale-105">
+            {user?.role === 'STUDENT' ? <GraduationCap className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
           </span>
+          <span className="text-xl font-extrabold tracking-tight text-primary">EvalIA</span>
+          <span className="hidden border-l border-line pl-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted sm:inline">ENSIASD</span>
         </button>
 
-        <nav className="flex items-center gap-3">
-          <button
-            onClick={() => onNavigate('home')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-              currentView === 'home'
-                ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            Accueil
-          </button>
+        <button
+          type="button"
+          aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+          aria-expanded={menuOpen}
+          aria-controls="primary-navigation"
+          onClick={() => setMenuOpen((open) => !open)}
+          className="rounded-lg p-2 text-muted transition hover:bg-canvas hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary md:hidden"
+        >
+          {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
 
-          {user && user.role === 'TEACHER' && (
-            <button
-              onClick={() => onNavigate('teacher_dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                currentView === 'teacher_dashboard'
-                  ? 'text-purple-700 bg-purple-50 font-semibold ring-1 ring-purple-200'
-                  : 'text-slate-600 hover:text-purple-700 hover:bg-purple-50/50'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4 text-purple-600" />
-              <span>Tableau de bord Examens</span>
-            </button>
+        <nav
+          id="primary-navigation"
+          aria-label="Navigation principale"
+          className={`${menuOpen ? 'flex' : 'hidden'} absolute left-0 right-0 top-full flex-col gap-1 border-b border-line bg-surface px-4 py-4 shadow-panel md:static md:flex md:flex-row md:items-center md:gap-2 md:border-0 md:bg-transparent md:p-0 md:shadow-none`}
+        >
+          {!user && (
+            <>
+              <button type="button" onClick={() => navigate('home')} className={navClass('home')}>Accueil</button>
+              <button type="button" onClick={() => navigate('login')} className={navClass('login')}>Connexion</button>
+              <button type="button" onClick={() => navigate('register')} className="min-h-10 rounded-lg bg-primary px-4 text-left text-sm font-semibold text-surface transition hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Créer un compte</button>
+            </>
           )}
 
-          {user && (
-            <button
-              onClick={() => onNavigate('generator')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer ${
-                currentView === 'generator'
-                  ? 'text-indigo-600 bg-indigo-50 font-semibold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>Générateur IA</span>
-            </button>
-          )}
-
-          {user ? (
-            <div className="flex items-center gap-3 ml-2 pl-3 border-l border-slate-200">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
-                  <UserIcon className="w-4 h-4" />
-                </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-sm font-semibold text-slate-800 leading-tight">{user.name}</p>
-                  <span
-                    className={`inline-block text-[11px] font-bold px-1.5 py-0.2 rounded-md ${
-                      user.role === 'TEACHER'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {user.role === 'TEACHER' ? 'Professeur' : 'Étudiant'}
-                  </span>
-                </div>
+          {user?.role === 'STUDENT' && (
+            <>
+              <button type="button" onClick={() => navigate('student_join_exam')} aria-current={currentView === 'student_join_exam' ? 'page' : undefined} className={navClass('student_join_exam')}><KeyRound className="h-4 w-4" />Rejoindre un examen</button>
+              <button type="button" onClick={() => navigate('student_exams')} aria-current={currentView === 'student_exams' ? 'page' : undefined} className={navClass('student_exams')}><BookOpen className="h-4 w-4" />Examens</button>
+              <button type="button" onClick={() => navigate('generator')} aria-current={currentView === 'generator' ? 'page' : undefined} className={navClass('generator')}><Sparkles className="h-4 w-4" />Générateur IA</button>
+              <button type="button" onClick={() => navigate('profile')} aria-current={currentView === 'profile' ? 'page' : undefined} className={navClass('profile')}><UserRound className="h-4 w-4" />Mon profil</button>
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-line pt-3 md:ml-2 md:mt-0 md:border-l md:border-t-0 md:pl-3 md:pt-0">
+                <span className="hidden text-sm font-semibold text-ink sm:inline">{user.name}</span>
+                <button type="button" onClick={() => { onLogout(); setMenuOpen(false) }} title="Se déconnecter" aria-label="Se déconnecter" className="rounded-lg p-2 text-muted transition hover:bg-danger-soft hover:text-danger">
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
-
-              <button
-                onClick={onLogout}
-                title="Se déconnecter"
-                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 ml-2">
-              <button
-                onClick={() => onNavigate('login')}
-                className={`px-4 py-2 text-sm font-semibold rounded-xl transition cursor-pointer ${
-                  currentView === 'login'
-                    ? 'text-indigo-600 bg-indigo-50'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                Connexion
-              </button>
-              <button
-                onClick={() => onNavigate('register')}
-                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition cursor-pointer"
-              >
-                Créer un compte
-              </button>
-            </div>
+            </>
           )}
         </nav>
       </div>

@@ -64,6 +64,49 @@ public class DatabaseConfig {
         """;
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
+            stmt.execute("ALTER TABLE evalia_users ADD COLUMN IF NOT EXISTS profile_photo TEXT");
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exams (
+                    id BIGSERIAL PRIMARY KEY,
+                    title VARCHAR(200) NOT NULL,
+                    description TEXT,
+                    teacher_id BIGINT NOT NULL REFERENCES evalia_users(id),
+                    teacher_name VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exam_questions (
+                    id BIGSERIAL PRIMARY KEY,
+                    exam_id BIGINT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+                    question TEXT NOT NULL,
+                    question_type VARCHAR(20) NOT NULL CHECK (question_type IN ('SINGLE', 'MULTIPLE')),
+                    explanation TEXT,
+                    order_index INTEGER NOT NULL
+                )
+                """);
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS question_options (
+                    id BIGSERIAL PRIMARY KEY,
+                    question_id BIGINT NOT NULL REFERENCES exam_questions(id) ON DELETE CASCADE,
+                    option_text TEXT NOT NULL,
+                    is_correct BOOLEAN NOT NULL DEFAULT FALSE,
+                    order_index INTEGER NOT NULL
+                )
+                """);
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exam_attempts (
+                    id BIGSERIAL PRIMARY KEY,
+                    exam_id BIGINT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+                    student_id BIGINT NOT NULL REFERENCES evalia_users(id) ON DELETE CASCADE,
+                    correct_count INTEGER NOT NULL,
+                    total_questions INTEGER NOT NULL,
+                    score NUMERIC(5, 2) NOT NULL,
+                    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_student ON exam_attempts(exam_id, student_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_attempts_submitted_at ON exam_attempts(submitted_at)");
         } catch (SQLException e) {
             System.err.println("Database auto-init failed or skipped: " + e.getMessage());
         }
