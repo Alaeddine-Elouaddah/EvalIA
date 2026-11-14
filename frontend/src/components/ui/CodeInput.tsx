@@ -58,7 +58,7 @@ export function CodeInput({ value, onChange, error, label = 'Code d’accès à 
               if (event.key === 'ArrowLeft' && index > 0) inputs.current[index - 1]?.focus()
               if (event.key === 'ArrowRight' && index < 5) inputs.current[index + 1]?.focus()
             }}
-            className={`h-12 min-w-0 flex-1 rounded-lg border bg-surface text-center font-mono text-lg font-bold uppercase text-ink outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 sm:h-14 sm:text-xl ${error ? 'border-danger' : 'border-line'}`}
+            className={`h-12 min-w-0 flex-1 rounded-xl border bg-white text-center font-mono text-lg font-bold uppercase tracking-wider text-ink shadow-sm outline-none transition-all focus:ring-4 focus:ring-sky-100 sm:h-14 sm:text-xl ${error ? 'border-danger focus:border-danger' : 'border-slate-200/80 focus:border-primary'}`}
           />
         ))}
       </div>

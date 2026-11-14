@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { m } from 'framer-motion'
 import { ArrowDownUp, Clock3, Copy, Eye, KeyRound, Pencil, Plus, Search, ShieldOff, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTeacherData } from '../../data/useTeacherData'
@@ -10,6 +11,7 @@ import { Card } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
+import { Toast } from '../../components/ui/Toast'
 import { PageHeader, SelectField } from './shared'
 import { formatDate } from './utils'
 
@@ -105,7 +107,7 @@ export function Exams() {
         </div>
 
         {actionError && <p role="alert" className="mt-3 rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">{actionError}</p>}
-        {copyStatus && <p role="status" className="mt-3 text-xs text-muted">{copyStatus}</p>}
+        {copyStatus && <div className="fixed bottom-5 right-5 z-[90] w-[min(24rem,calc(100vw-2.5rem))]"><Toast message={copyStatus} onClose={() => setCopyStatus('')} /></div>}
 
         {filtered.length === 0 ? (
           <div className="mt-4">
@@ -123,7 +125,7 @@ export function Exams() {
               <thead>
                 <tr className="border-y border-line text-[11px] font-bold uppercase tracking-wide text-muted">
                   <th scope="col" className="py-3 pr-4">Examen</th>
-                  <th scope="col" className="px-3 py-3">Public</th>
+                  <th scope="col" className="w-[210px] px-3 py-3">Public</th>
                   <th scope="col" className="px-3 py-3">Questions</th>
                   <th scope="col" className="px-3 py-3">Durée</th>
                   <th scope="col" className="px-3 py-3"><span className="inline-flex items-center gap-1"><ArrowDownUp className="h-3 w-3" /> Ouverture</span></th>
@@ -134,15 +136,21 @@ export function Exams() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filtered.map((exam) => (
-                  <tr key={exam.id} className="group transition hover:bg-canvas/70">
+                {filtered.map((exam, index) => (
+                  <m.tr
+                    key={exam.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18, delay: index * 0.035 }}
+                    className="group transition-colors duration-150 hover:bg-sky-50/60"
+                  >
                     <td className="py-4 pr-4">
                       <p className="max-w-[220px] truncate text-sm font-semibold text-ink">{exam.title}</p>
                       <p className="mt-1 text-xs text-muted">{exam.subject} · {exam.mode === 'ai' ? 'Généré avec IA' : 'Création manuelle'}</p>
                     </td>
-                    <td className="px-3 py-4">
+                    <td className="w-[210px] px-3 py-4">
                       <div className="flex max-w-[190px] flex-wrap gap-1">
-                        {getTargetLabels(exam).slice(0, 2).map((label) => <Badge key={label} status="info">{label}</Badge>)}
+                        {getTargetLabels(exam).slice(0, 2).map((label) => <Badge key={label} status="info" title={label} className="max-w-full truncate whitespace-nowrap">{label}</Badge>)}
                         {(exam.targets?.length ?? 0) > 2 && <Badge status="info">+{(exam.targets?.length ?? 0) - 2}</Badge>}
                         {!exam.targets?.length && <span className="text-xs text-muted">Non défini</span>}
                       </div>
@@ -155,27 +163,27 @@ export function Exams() {
                       {exam.accessCode ? (
                         <div className="flex items-center gap-1.5">
                           <span className={`font-mono text-xs font-bold tracking-wider ${exam.accessEnabled ? 'text-ink' : 'text-muted line-through'}`}>{exam.accessCode}</span>
-                          <button type="button" onClick={() => copyCode(exam.accessCode!)} aria-label={`Copier le code ${exam.accessCode}`} title="Copier le code" className="rounded p-1 text-muted hover:bg-primary-50 hover:text-primary"><Copy className="h-3.5 w-3.5" /></button>
+                          <button type="button" onClick={() => copyCode(exam.accessCode!)} aria-label={`Copier le code ${exam.accessCode}`} title="Copier le code" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Copy className="h-4 w-4" /></button>
                           {!exam.accessEnabled && <span className="text-[10px] text-danger">Désactivé</span>}
                         </div>
                       ) : <span className="text-xs text-muted">À la publication</span>}
                     </td>
                     <td className="px-3 py-4 text-sm text-muted">{exam.participants}</td>
                     <td className="py-4 pl-3">
-                      <div className="flex justify-end gap-1">
-                        <button type="button" onClick={() => setSelected(exam)} aria-label={`Voir ${exam.title}`} title="Voir" className="rounded-lg p-2 text-muted transition hover:bg-primary-50 hover:text-primary"><Eye className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => editExam(exam)} aria-label={`Modifier ${exam.title}`} title="Modifier" className="rounded-lg p-2 text-muted transition hover:bg-primary-50 hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => duplicateExam(exam.id)} aria-label={`Dupliquer ${exam.title}`} title="Dupliquer" className="rounded-lg p-2 text-muted transition hover:bg-primary-50 hover:text-primary"><Copy className="h-4 w-4" /></button>
+                      <div className="flex justify-end gap-1 transition-opacity sm:opacity-55 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                        <button type="button" onClick={() => setSelected(exam)} aria-label={`Voir ${exam.title}`} title="Voir" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Eye className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => editExam(exam)} aria-label={`Modifier ${exam.title}`} title="Modifier" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => duplicateExam(exam.id)} aria-label={`Dupliquer ${exam.title}`} title="Dupliquer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Copy className="h-4 w-4" /></button>
                         {exam.accessCode && exam.status === 'published' && (
                           <>
-                            <button type="button" onClick={() => { setCodeTarget(exam); setActionError('') }} aria-label={`Régénérer le code de ${exam.title}`} title="Régénérer le code" className="rounded-lg p-2 text-muted transition hover:bg-accent-soft hover:text-accent-strong"><KeyRound className="h-4 w-4" /></button>
-                            <button type="button" onClick={() => exam.accessEnabled ? setAccessTarget(exam) : setAccessEnabled(exam.id, true)} aria-label={exam.accessEnabled ? `Désactiver l’accès à ${exam.title}` : `Réactiver l’accès à ${exam.title}`} title={exam.accessEnabled ? 'Désactiver l’accès' : 'Réactiver l’accès'} className="rounded-lg p-2 text-muted transition hover:bg-danger-soft hover:text-danger"><ShieldOff className="h-4 w-4" /></button>
+                            <button type="button" onClick={() => { setCodeTarget(exam); setActionError('') }} aria-label={`Régénérer le code de ${exam.title}`} title="Régénérer le code" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-accent-soft hover:text-accent-strong"><KeyRound className="h-4 w-4" /></button>
+                            <button type="button" onClick={() => exam.accessEnabled ? setAccessTarget(exam) : setAccessEnabled(exam.id, true)} aria-label={exam.accessEnabled ? `Désactiver l’accès à ${exam.title}` : `Réactiver l’accès à ${exam.title}`} title={exam.accessEnabled ? 'Désactiver l’accès' : 'Réactiver l’accès'} className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-danger-soft hover:text-danger"><ShieldOff className="h-4 w-4" /></button>
                           </>
                         )}
-                        <button type="button" onClick={() => setDeleteTarget(exam)} aria-label={`Supprimer ${exam.title}`} title="Supprimer" className="rounded-lg p-2 text-muted transition hover:bg-danger-soft hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => setDeleteTarget(exam)} aria-label={`Supprimer ${exam.title}`} title="Supprimer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-danger-soft hover:text-danger"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
-                  </tr>
+                  </m.tr>
                 ))}
               </tbody>
             </table>

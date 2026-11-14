@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { m } from 'framer-motion'
 import { Search, UsersRound } from 'lucide-react'
 import { useTeacherData } from '../../data/useTeacherData'
 import { Badge } from '../../components/ui/Badge'
@@ -54,8 +55,14 @@ export function Students() {
                 <th scope="col" className="py-3 pr-4">Étudiant</th><th scope="col" className="px-3 py-3">Groupe</th><th scope="col" className="px-3 py-3">Tentatives</th><th scope="col" className="px-3 py-3">Moyenne</th><th scope="col" className="px-3 py-3">Activité</th>
               </tr></thead>
               <tbody className="divide-y divide-line">
-                {studentRows.map((student) => (
-                  <tr key={student.id} className="transition hover:bg-canvas/70">
+                {studentRows.map((student, index) => (
+                  <m.tr
+                    key={student.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18, delay: index * 0.035 }}
+                    className="transition-colors hover:bg-sky-50/60"
+                  >
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-bold text-primary">{initials(student.name)}</span>
@@ -66,7 +73,7 @@ export function Students() {
                     <td className="px-3 py-4 text-sm text-ink">{student.attempts}</td>
                     <td className="px-3 py-4 text-sm font-semibold text-ink">{student.average === null ? '—' : `${student.average.toFixed(1)}/20`}</td>
                     <td className="px-3 py-4"><Badge status={student.attempts ? 'success' : 'warning'}>{student.attempts ? 'A participé' : 'Aucune tentative'}</Badge></td>
-                  </tr>
+                  </m.tr>
                 ))}
               </tbody>
             </table>

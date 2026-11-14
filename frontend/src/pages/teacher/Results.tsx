@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { m } from 'framer-motion'
 import { BarChart3, Search } from 'lucide-react'
 import { useTeacherData } from '../../data/useTeacherData'
 import { Badge } from '../../components/ui/Badge'
@@ -61,7 +62,12 @@ export function Results() {
               <div key={item.label} className="flex flex-col items-center gap-2">
                 <span className="text-xs font-semibold text-ink">{item.count}</span>
                 <div className="flex h-32 w-full items-end rounded-t-lg bg-canvas px-2">
-                  <div className="w-full rounded-t-md bg-primary transition-all" style={{ height: `${Math.max(4, item.count / maxCount * 100)}%` }} />
+                  <m.div
+                    className="w-full rounded-t-md bg-gradient-to-t from-primary to-sky"
+                    initial={{ height: 0 }}
+                    animate={{ height: `${Math.max(4, item.count / maxCount * 100)}%` }}
+                    transition={{ duration: 0.55, delay: 0.08 }}
+                  />
                 </div>
                 <span className="text-[11px] font-medium text-muted">{item.label}</span>
               </div>
@@ -83,14 +89,20 @@ export function Results() {
             <table className="w-full min-w-[720px] border-collapse text-left">
               <thead><tr className="border-y border-line text-[11px] font-bold uppercase tracking-wide text-muted"><th scope="col" className="py-3 pr-4">Étudiant</th><th scope="col" className="px-3 py-3">Examen</th><th scope="col" className="px-3 py-3">Note</th><th scope="col" className="px-3 py-3">Statut</th><th scope="col" className="px-3 py-3">Soumis le</th></tr></thead>
               <tbody className="divide-y divide-line">
-                {visibleResults.map((result) => (
-                  <tr key={result.id} className="transition hover:bg-canvas/70">
+                {visibleResults.map((result, index) => (
+                  <m.tr
+                    key={result.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18, delay: index * 0.035 }}
+                    className="transition-colors hover:bg-sky-50/60"
+                  >
                     <td className="py-4 pr-4"><span className="block text-sm font-semibold text-ink">{result.studentName}</span><span className="text-xs text-muted">{result.studentEmail}</span></td>
                     <td className="max-w-[240px] truncate px-3 py-4 text-sm text-muted">{result.examTitle}</td>
                     <td className="px-3 py-4 text-sm font-bold text-ink">{result.score === null ? '—' : `${result.score}/20`}</td>
                     <td className="px-3 py-4"><Badge status={result.status} /></td>
                     <td className="px-3 py-4 text-xs text-muted">{result.submittedAt ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(result.submittedAt)) : '—'}</td>
-                  </tr>
+                  </m.tr>
                 ))}
               </tbody>
             </table>

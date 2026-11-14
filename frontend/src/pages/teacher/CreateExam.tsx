@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { m, useReducedMotion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDown,
@@ -122,6 +123,7 @@ export function CreateExam() {
   const [draggedQuestion, setDraggedQuestion] = useState<string | null>(null)
   const [publishedExam, setPublishedExam] = useState<TeacherExam | null>(null)
   const [copyMessage, setCopyMessage] = useState('')
+  const reduceMotion = useReducedMotion()
 
   const hasDeis = targets.includes(ENGLISH_PROGRAM_ID)
   const otherTargets = targets.filter((id) => id !== ENGLISH_PROGRAM_ID)
@@ -357,15 +359,38 @@ export function CreateExam() {
       <section className="mx-auto max-w-2xl py-8">
         <PageHeader eyebrow="Publication terminée" title="Examen publié !" description="Partage ce code avec les étudiants concernés pour qu’ils rejoignent l’examen." />
         <Card className="text-center">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-success-soft text-success"><CheckCircle2 className="h-7 w-7" /></span>
+          <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+            <m.span
+              initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.3, type: 'spring', stiffness: 260, damping: 18 }}
+              className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success-soft text-success ring-1 ring-inset ring-success-line"
+            >
+              <CheckCircle2 className="h-7 w-7" />
+            </m.span>
+            <span className="absolute -right-1 top-0 h-2.5 w-2.5 rounded-full bg-sky-300 motion-safe:animate-soft-float" aria-hidden="true" />
+            <span className="absolute -left-2 top-4 h-2 w-2 rounded-full bg-primary-300 motion-safe:animate-soft-float" aria-hidden="true" />
+            <span className="absolute bottom-0 right-1 h-1.5 w-1.5 rounded-full bg-success motion-safe:animate-soft-float" aria-hidden="true" />
+          </div>
           <p className="mt-4 text-sm font-semibold text-ink">Code d’accès</p>
-          <p className="mt-2 font-mono text-4xl font-extrabold tracking-[0.3em] text-primary sm:text-5xl" aria-label={`Code ${publishedExam.accessCode?.split('').join(' ')}`}>
-            {publishedExam.accessCode}
-          </p>
+          <div role="img" className="mt-3 flex justify-center gap-1.5 sm:gap-2.5" aria-label={`Code ${publishedExam.accessCode?.split('').join(' ')}`}>
+            {Array.from(publishedExam.accessCode ?? '').map((character, index) => (
+              <m.span
+                key={`${character}-${index}`}
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.22, delay: reduceMotion ? 0 : index * 0.065 }}
+                className="font-mono text-4xl font-extrabold tracking-[0.08em] text-primary sm:text-5xl"
+                aria-hidden="true"
+              >
+                {character}
+              </m.span>
+            ))}
+          </div>
           <p className="mt-3 text-sm text-muted">Le code a été généré de façon unique. Communique-le uniquement aux étudiants concernés.</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <Button icon={<Copy className="h-4 w-4" />} onClick={() => copyText(publishedExam.accessCode ?? '', 'Le code')}>Copier le code</Button>
-            <Button variant="secondary" icon={<Clipboard className="h-4 w-4" />} onClick={() => copyText(examLink, 'Le lien')}>Copier le lien</Button>
+            <Button icon={copyMessage === 'Le code copié.' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} onClick={() => copyText(publishedExam.accessCode ?? '', 'Le code')}>Copier le code</Button>
+            <Button variant="secondary" icon={copyMessage === 'Le lien copié.' ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />} onClick={() => copyText(examLink, 'Le lien')}>Copier le lien</Button>
           </div>
           {copyMessage && <p role="status" className="mt-3 text-xs font-medium text-muted">{copyMessage}</p>}
           <div className="mt-7 border-t border-line pt-5 text-left">
@@ -529,8 +554,11 @@ export function CreateExam() {
             ) : (
               <div className="mt-5 space-y-4">
                 {questions.map((question, questionIndex) => (
-                  <article
+                  <m.article
                     key={question.id}
+                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.2, delay: reduceMotion ? 0 : questionIndex * 0.04 }}
                     draggable
                     onDragStart={() => setDraggedQuestion(question.id)}
                     onDragOver={(event) => event.preventDefault()}
@@ -629,7 +657,7 @@ export function CreateExam() {
                         <button type="button" aria-label={`Supprimer la question ${questionIndex + 1}`} onClick={() => setQuestions((current) => current.filter((item) => item.id !== question.id))} className="rounded-lg p-2 text-muted hover:bg-danger-soft hover:text-danger"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </div>
-                  </article>
+                  </m.article>
                 ))}
               </div>
             )}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, FileUp, LoaderCircle, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { generateQcm } from '../../api/qcm'
@@ -233,7 +234,8 @@ export function AiGenerator() {
           {questions.length === 0 ? (
             loading ? null : <EmptyState icon={FileUp} title="Importez un PDF pour commencer" description="Gemini analysera le document et proposera des questions que vous pourrez corriger avant de créer l’examen." />
           ) : questions.map((question, index) => (
-            <Card key={question.id} padding="md">
+            <m.div key={question.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: index * 0.04 }}>
+            <Card padding="md">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-xs font-bold text-primary">{index + 1}</span>
                 <div className="min-w-0 flex-1 space-y-3">
@@ -299,6 +301,7 @@ export function AiGenerator() {
                 </div>
               </div>
             </Card>
+            </m.div>
           ))}
         </div>
       </div>

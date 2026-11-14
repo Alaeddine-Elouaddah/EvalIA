@@ -17,8 +17,8 @@ export function Navbar({ user, currentView, onNavigate, onLogout }: NavbarProps)
     setMenuOpen(false)
   }
 
-  const navClass = (view: AppView) => `flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-medium transition md:w-auto ${
-    currentView === view ? 'bg-primary-50 text-primary' : 'text-muted hover:bg-canvas hover:text-ink'
+  const navClass = (view: AppView) => `flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition md:w-auto ${
+    currentView === view ? 'bg-primary-50 text-primary' : 'text-muted hover:bg-sky-50 hover:text-ink'
   }`
 
   return (
@@ -52,7 +52,7 @@ export function Navbar({ user, currentView, onNavigate, onLogout }: NavbarProps)
             <>
               <button type="button" onClick={() => navigate('home')} className={navClass('home')}>Accueil</button>
               <button type="button" onClick={() => navigate('login')} className={navClass('login')}>Connexion</button>
-              <button type="button" onClick={() => navigate('register')} className="min-h-10 rounded-lg bg-primary px-4 text-left text-sm font-semibold text-surface transition hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Créer un compte</button>
+              <button type="button" onClick={() => navigate('register')} className="min-h-11 rounded-[10px] bg-gradient-to-r from-primary-600 to-sky px-4 text-left text-sm font-semibold text-white shadow-button transition hover:-translate-y-0.5 hover:shadow-button-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Créer un compte étudiant</button>
             </>
           )}
 

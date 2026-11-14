@@ -1,4 +1,5 @@
 import { Activity, ArrowRight, BookOpenCheck, CalendarDays, ClipboardList, GraduationCap, Plus, Sparkles, UsersRound } from 'lucide-react'
+import { m } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTeacherData } from '../../data/useTeacherData'
 import { Badge } from '../../components/ui/Badge'
@@ -44,9 +45,15 @@ export function Dashboard() {
           {recentExams.length === 0 ? (
             <EmptyState icon={ClipboardList} title="Aucun examen pour le moment" description="Créez votre premier examen pour commencer à suivre les résultats." actionLabel="Créer un examen" onAction={() => navigate('/teacher/exams/create')} />
           ) : (
-            <div className="divide-y divide-line">
-              {recentExams.map((exam) => (
-                <div key={exam.id} className="flex flex-col gap-3 py-4 first:pt-1 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {recentExams.map((exam, index) => (
+                <m.div
+                  key={exam.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18, delay: index * 0.04 }}
+                  className="flex flex-col gap-3 border-b border-slate-100 py-4 last:border-b-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{exam.title}</p>
                     <p className="mt-1 text-xs text-muted">{exam.subject} <span aria-hidden="true">·</span> {exam.questions.length} questions <span aria-hidden="true">·</span> {formatDate(exam.date)}</p>
@@ -55,7 +62,7 @@ export function Dashboard() {
                     <span className="text-xs text-muted">{exam.participants} participants</span>
                     <Badge status={exam.status} />
                   </div>
-                </div>
+                </m.div>
               ))}
             </div>
           )}
