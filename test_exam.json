@@ -1,6 +1,7 @@
 {
   "title": "Examen Test Algorithmique",
   "description": "Evaluation sur les tris",
+  "accessMode": "direct",
   "questions": [
     {
       "question": "Quelle est la complexite du tri fusion ?",

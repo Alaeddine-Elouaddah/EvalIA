@@ -107,6 +107,28 @@ public class DatabaseConfig {
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_student ON exam_attempts(exam_id, student_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_attempts_submitted_at ON exam_attempts(submitted_at)");
+
+            // ------------------------------------------------------------------
+            // Migration additive et non destructive : métadonnées produit des examens.
+            // Chaque instruction est idempotente (ADD COLUMN IF NOT EXISTS) et
+            // n'écrase ni ne supprime aucune colonne ni aucune donnée existante.
+            // ------------------------------------------------------------------
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS subject VARCHAR(120)");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'published'");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS access_code VARCHAR(6)");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS access_enabled BOOLEAN NOT NULL DEFAULT TRUE");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS opens_at TIMESTAMP");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS language VARCHAR(2) DEFAULT 'fr'");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS mode VARCHAR(10) DEFAULT 'manual'");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS targets TEXT[]");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS reveal_results BOOLEAN DEFAULT TRUE");
+            stmt.execute("ALTER TABLE exams ADD COLUMN IF NOT EXISTS randomize_questions BOOLEAN DEFAULT FALSE");
+            stmt.execute("ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS points NUMERIC(4,1) DEFAULT 1");
+            stmt.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_access_code
+                    ON exams(access_code) WHERE access_code IS NOT NULL
+                """);
         } catch (SQLException e) {
             System.err.println("Database auto-init failed or skipped: " + e.getMessage());
         }

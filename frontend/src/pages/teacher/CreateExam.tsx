@@ -44,6 +44,7 @@ interface ExamDraft {
   questions: TeacherQuestion[]
   revealResults: boolean
   randomizeQuestions: boolean
+  accessMode: 'code' | 'direct'
   step: number
 }
 
@@ -117,6 +118,7 @@ export function CreateExam() {
   )
   const [revealResults, setRevealResults] = useState(existing?.revealResults ?? restoredDraft?.revealResults ?? true)
   const [randomizeQuestions, setRandomizeQuestions] = useState(existing?.randomizeQuestions ?? restoredDraft?.randomizeQuestions ?? false)
+  const [accessMode, setAccessMode] = useState<'code' | 'direct'>(existing?.accessMode ?? restoredDraft?.accessMode ?? 'code')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -143,6 +145,7 @@ export function CreateExam() {
       questions,
       revealResults,
       randomizeQuestions,
+      accessMode,
       step,
       ...overrides,
     }
@@ -300,7 +303,11 @@ export function CreateExam() {
     setError('')
     try {
       const draft = {
-        ...(existing ? { id: existing.id, participants: existing.participants } : {}),
+        ...(existing ? {
+          id: existing.id,
+          participants: existing.participants,
+          description: existing.description ?? undefined,
+        } : {}),
         title: title.trim(),
         subject: subject.trim(),
         durationMinutes: Number(duration),
@@ -312,9 +319,10 @@ export function CreateExam() {
         questions,
         revealResults,
         randomizeQuestions,
+        accessMode,
       }
       const result = existing?.accessCode
-        ? saveExam({ ...draft, status: 'published', accessCode: existing.accessCode, accessEnabled: existing.accessEnabled })
+        ? await saveExam({ ...draft, status: 'published', accessCode: existing.accessCode, accessEnabled: existing.accessEnabled })
         : await publishExam(draft)
       localStorage.removeItem(DRAFT_STORAGE_KEY)
       setPendingQuestions([])
@@ -347,6 +355,9 @@ export function CreateExam() {
     setLanguage('fr')
     setMode('manual')
     setQuestions([])
+    setRevealResults(true)
+    setRandomizeQuestions(false)
+    setAccessMode('code')
     setError('')
     setCopyMessage('')
     setPendingQuestions([])
@@ -496,6 +507,23 @@ export function CreateExam() {
                 options={[{ value: 'fr', label: 'Français' }, { value: 'en', label: 'English' }]}
               />
               {hasDeis && <p className="mt-2 text-xs font-medium text-info">DEIS is taught in English: this exam must be written in English.</p>}
+            </div>
+            <div className="mt-6 max-w-sm">
+              <SelectField
+                id="exam-access-mode"
+                label="Mode d'accès à l'examen"
+                value={accessMode}
+                onChange={(value) => setAccessMode(value as 'code' | 'direct')}
+                options={[
+                  { value: 'code', label: 'Accès avec code (étudiant saisit un code)' },
+                  { value: 'direct', label: 'Accès direct (depuis espace étudiant)' }
+                ]}
+              />
+              <p className="mt-2 text-xs text-muted">
+                {accessMode === 'code' 
+                  ? 'Les étudiants devront saisir le code de l\'examen pour y accéder.'
+                  : 'L\'examen apparaîtra directement dans l\'espace étudiant, sans code requis.'}
+              </p>
             </div>
           </section>
         )}

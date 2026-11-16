@@ -54,6 +54,7 @@ export interface ExamQuestionDTO {
   question: string
   questionType: QuestionType
   explanation?: string
+  points?: number
   options: QuestionOptionDTO[]
 }
 
@@ -64,6 +65,21 @@ export interface ExamDTO {
   teacherId?: number
   teacherName?: string
   createdAt?: string
+  // Métadonnées produit (Lot 1 backend). Toutes optionnelles et nullables :
+  // le backend renvoie null pour un champ non renseigné.
+  subject?: string | null
+  status?: 'draft' | 'published' | 'finished' | null
+  accessCode?: string | null
+  accessEnabled?: boolean | null
+  durationMinutes?: number | null
+  opensAt?: string | null
+  language?: 'fr' | 'en' | null
+  mode?: 'manual' | 'ai' | null
+  targets?: string[] | null
+  revealResults?: boolean | null
+  randomizeQuestions?: boolean | null
+  accessMode?: 'code' | 'direct' | null
+  participants?: number
   questions: ExamQuestionDTO[]
 }
 

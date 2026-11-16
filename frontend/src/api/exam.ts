@@ -99,3 +99,32 @@ export function fetchTeacherStudents(): Promise<TeacherStudentDTO[]> {
 export function fetchTeacherGrades(): Promise<ExamAttemptDTO[]> {
   return requestJson('/evalia/api/exams/grades')
 }
+
+// ------------------------------------------------------------------
+// Lot 2 — espace enseignant (édition, code d'accès, activation)
+// Ajouts uniquement : les fonctions ci-dessus ne sont pas modifiées.
+// ------------------------------------------------------------------
+
+export function fetchExamByCode(code: string): Promise<ExamDTO> {
+  return requestJson(`/evalia/api/exams/join/${encodeURIComponent(code)}`)
+}
+
+export function fetchExamById(examId: number): Promise<ExamDTO> {
+  return requestJson(`/evalia/api/exams/${examId}`)
+}
+
+export function updateExam(examId: number, exam: ExamDTO): Promise<ExamDTO> {
+  return requestJson(`/evalia/api/exams/${examId}`, 'PUT', exam)
+}
+
+/**
+ * Régénère le code d'accès côté serveur.
+ * Appel sans corps : le backend accepte tout Content-Type sur cette route.
+ */
+export function regenerateExamCode(examId: number): Promise<{ accessCode: string; accessEnabled: boolean }> {
+  return requestJson(`/evalia/api/exams/${examId}/regenerate-code`, 'POST')
+}
+
+export function setExamAccess(examId: number, enabled: boolean): Promise<{ accessEnabled: boolean }> {
+  return requestJson(`/evalia/api/exams/${examId}/access`, 'PATCH', { enabled })
+}

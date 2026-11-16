@@ -106,6 +106,35 @@ public class ExamResource {
             question.setExplanation(null);
             question.getOptions().forEach(option -> option.setCorrect(false));
         });
+        // Un étudiant ne doit jamais recevoir le code d'accès de l'examen.
+        exam.setAccessCode(null);
+        return Response.ok(exam).build();
+    }
+
+    @GET
+    @Path("/join/{code}")
+    public Response getExamByCode(
+            @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+            @PathParam("code") String code) {
+        authenticateStudent(authHeader);
+        Optional<Exam> examOpt = examRepository.findByAccessCode(code);
+        if (examOpt.isEmpty()) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Code invalide ou examen introuvable"))
+                    .build();
+        }
+        Exam exam = examOpt.get();
+        if (!Boolean.TRUE.equals(exam.getAccessEnabled())) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(Map.of("error", "L'accès à cet examen a été désactivé par le professeur."))
+                    .build();
+        }
+        // Masquer les réponses correctes et le code d'accès côté étudiant.
+        exam.getQuestions().forEach(question -> {
+            question.setExplanation(null);
+            question.getOptions().forEach(option -> option.setCorrect(false));
+        });
+        exam.setAccessCode(null);
         return Response.ok(exam).build();
     }
 
@@ -181,45 +210,9 @@ public class ExamResource {
     public Response createExam(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader, Exam exam) {
         Claims claims = authenticateTeacher(authHeader);
 
-        if (exam == null || exam.getTitle() == null || exam.getTitle().trim().isEmpty()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "Le titre de l'examen est obligatoire"))
-                    .build();
-        }
-
-        if (exam.getQuestions() == null || exam.getQuestions().isEmpty()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "L'examen doit contenir au moins une question"))
-                    .build();
-        }
-
-        // Validate each question
-        for (int i = 0; i < exam.getQuestions().size(); i++) {
-            ExamQuestion q = exam.getQuestions().get(i);
-            if (q.getQuestion() == null || q.getQuestion().trim().isEmpty()) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(Map.of("error", "La question n°" + (i + 1) + " n'a pas de texte"))
-                        .build();
-            }
-            if (q.getOptions() == null || q.getOptions().size() < 2) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(Map.of("error", "La question n°" + (i + 1) + " doit avoir au moins 2 options"))
-                        .build();
-            }
-
-            long correctCount = q.getOptions().stream().filter(QuestionOption::isCorrect).count();
-            if (correctCount == 0) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(Map.of("error", "La question n°" + (i + 1) + " doit avoir au moins une réponse correcte"))
-                        .build();
-            }
-
-            // Si le type est SINGLE mais plusieurs réponses sont cochées
-            if ("SINGLE".equalsIgnoreCase(q.getQuestionType()) && correctCount > 1) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(Map.of("error", "La question n°" + (i + 1) + " est à choix unique mais possède plusieurs réponses correctes"))
-                        .build();
-            }
+        String validationError = validateExam(exam);
+        if (validationError != null) {
+            return badRequest(validationError);
         }
 
         Long teacherId = claims.get("userId", Long.class);
@@ -235,6 +228,95 @@ public class ExamResource {
                     .entity(Map.of("error", e.getMessage()))
                     .build();
         }
+    }
+
+    /**
+     * Met à jour un examen existant (édition complète).
+     * Refusé avec 409 si l'examen possède déjà au moins une tentative (D5-B).
+     */
+    @PUT
+    @Path("/{id}")
+    public Response updateExam(
+            @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+            @PathParam("id") Long id,
+            Exam exam) {
+        Claims claims = authenticateTeacher(authHeader);
+        Long teacherId = claims.get("userId", Long.class);
+
+        Optional<Exam> existing = examRepository.findById(id);
+        if (existing.isEmpty()) {
+            return notFound("Examen introuvable");
+        }
+        if (!existing.get().getTeacherId().equals(teacherId)) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(Map.of("error", "Vous n'êtes pas autorisé à modifier cet examen"))
+                    .build();
+        }
+
+        String validationError = validateExam(exam);
+        if (validationError != null) {
+            return badRequest(validationError);
+        }
+
+        exam.setId(id);
+        exam.setTeacherId(teacherId);
+        exam.setTeacherName(claims.get("name", String.class));
+
+        ExamRepository.UpdateStatus status;
+        try {
+            status = examRepository.updateExam(exam);
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+
+        return switch (status) {
+            case NOT_FOUND -> notFound("Examen introuvable ou non autorisé");
+            case LOCKED_BY_ATTEMPTS -> Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", "Cet examen possède déjà des tentatives : il ne peut plus être modifié"))
+                    .build();
+            case UPDATED -> Response.ok(exam).build();
+        };
+    }
+
+    /** Régénère le code d'accès côté serveur et réactive l'accès. */
+    @POST
+    @Path("/{id}/regenerate-code")
+    @Consumes(MediaType.WILDCARD)
+    public Response regenerateAccessCode(
+            @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+            @PathParam("id") Long id) {
+        Claims claims = authenticateTeacher(authHeader);
+        Long teacherId = claims.get("userId", Long.class);
+
+        Optional<String> code = examRepository.regenerateAccessCode(id, teacherId);
+        if (code.isEmpty()) {
+            return notFound("Examen introuvable ou non autorisé");
+        }
+        return Response.ok(Map.of("accessCode", code.get(), "accessEnabled", true)).build();
+    }
+
+    /** Active / désactive l'accès à un examen. */
+    @PATCH
+    @Path("/{id}/access")
+    public Response setExamAccess(
+            @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+            @PathParam("id") Long id,
+            Map<String, Boolean> body) {
+        Claims claims = authenticateTeacher(authHeader);
+        Long teacherId = claims.get("userId", Long.class);
+
+        Boolean enabled = body == null ? null : body.get("enabled");
+        if (enabled == null) {
+            return badRequest("Le champ 'enabled' est obligatoire");
+        }
+
+        boolean updated = examRepository.setAccessEnabled(id, teacherId, enabled);
+        if (!updated) {
+            return notFound("Examen introuvable ou non autorisé");
+        }
+        return Response.ok(Map.of("accessEnabled", enabled)).build();
     }
 
     @GET
@@ -278,5 +360,83 @@ public class ExamResource {
                     .build();
         }
         return Response.ok(Map.of("message", "Examen supprimé avec succès")).build();
+    }
+
+    // ------------------------------------------------------------------
+    // Validation et réponses d'erreur partagées (POST / PUT)
+    // ------------------------------------------------------------------
+
+    /** Retourne un message d'erreur, ou null si l'examen est valide. */
+    private String validateExam(Exam exam) {
+        if (exam == null || exam.getTitle() == null || exam.getTitle().trim().isEmpty()) {
+            return "Le titre de l'examen est obligatoire";
+        }
+
+        if (exam.getQuestions() == null || exam.getQuestions().isEmpty()) {
+            return "L'examen doit contenir au moins une question";
+        }
+
+        // Validate each question
+        for (int i = 0; i < exam.getQuestions().size(); i++) {
+            ExamQuestion q = exam.getQuestions().get(i);
+            if (q.getQuestion() == null || q.getQuestion().trim().isEmpty()) {
+                return "La question n°" + (i + 1) + " n'a pas de texte";
+            }
+            if (q.getOptions() == null || q.getOptions().size() < 2) {
+                return "La question n°" + (i + 1) + " doit avoir au moins 2 options";
+            }
+
+            long correctCount = q.getOptions().stream().filter(QuestionOption::isCorrect).count();
+            if (correctCount == 0) {
+                return "La question n°" + (i + 1) + " doit avoir au moins une réponse correcte";
+            }
+
+            // Si le type est SINGLE mais plusieurs réponses sont cochées
+            if ("SINGLE".equalsIgnoreCase(q.getQuestionType()) && correctCount > 1) {
+                return "La question n°" + (i + 1) + " est à choix unique mais possède plusieurs réponses correctes";
+            }
+
+            if (q.getPoints() < 0) {
+                return "Le barème de la question n°" + (i + 1) + " ne peut pas être négatif";
+            }
+        }
+
+        return validateMetadata(exam);
+    }
+
+    /** Valide les métadonnées produit (Phase 1). */
+    private String validateMetadata(Exam exam) {
+        if (exam.getStatus() != null && !exam.getStatus().isBlank()
+                && !Set.of("draft", "published", "finished").contains(exam.getStatus().trim().toLowerCase())) {
+            return "Statut d'examen invalide (attendu : draft, published ou finished)";
+        }
+        if (exam.getLanguage() != null && !exam.getLanguage().isBlank()
+                && !Set.of("fr", "en").contains(exam.getLanguage().trim().toLowerCase())) {
+            return "Langue invalide (attendu : fr ou en)";
+        }
+        if (exam.getMode() != null && !exam.getMode().isBlank()
+                && !Set.of("manual", "ai").contains(exam.getMode().trim().toLowerCase())) {
+            return "Mode de création invalide (attendu : manual ou ai)";
+        }
+        if (exam.getDurationMinutes() != null && exam.getDurationMinutes() <= 0) {
+            return "La durée de l'examen doit être positive";
+        }
+        if (exam.getAccessCode() != null && !exam.getAccessCode().isBlank()
+                && !exam.getAccessCode().trim().toUpperCase().matches("[A-Z0-9]{4,6}")) {
+            return "Le code d'accès doit contenir entre 4 et 6 caractères alphanumériques";
+        }
+        return null;
+    }
+
+    private Response badRequest(String message) {
+        return Response.status(Response.Status.BAD_REQUEST)
+                .entity(Map.of("error", message))
+                .build();
+    }
+
+    private Response notFound(String message) {
+        return Response.status(Response.Status.NOT_FOUND)
+                .entity(Map.of("error", message))
+                .build();
     }
 }

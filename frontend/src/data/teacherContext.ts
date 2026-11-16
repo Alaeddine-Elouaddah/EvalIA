@@ -1,5 +1,6 @@
 import { createContext } from 'react'
 import type { BankQuestion, MockResult, MockStudent, TeacherExam, TeacherQuestion } from '../types/teacher'
+import type { TeacherExamDraft, TeacherExamInput } from './examAdapter'
 
 export interface TeacherDataContextValue {
   exams: TeacherExam[]
@@ -7,12 +8,12 @@ export interface TeacherDataContextValue {
   results: MockResult[]
   questionBank: BankQuestion[]
   pendingQuestions: TeacherQuestion[]
-  saveExam: (exam: Omit<TeacherExam, 'id' | 'participants'> & { id?: string; participants?: number }) => TeacherExam
-  publishExam: (exam: Omit<TeacherExam, 'id' | 'participants' | 'status' | 'accessCode' | 'accessEnabled'> & { id?: string; participants?: number }) => Promise<TeacherExam>
-  deleteExam: (id: string) => void
-  duplicateExam: (id: string) => void
+  saveExam: (exam: TeacherExamInput) => Promise<TeacherExam>
+  publishExam: (exam: TeacherExamDraft) => Promise<TeacherExam>
+  deleteExam: (id: string) => Promise<void>
+  duplicateExam: (id: string) => Promise<void>
   regenerateExamCode: (id: string) => Promise<string>
-  setAccessEnabled: (id: string, enabled: boolean) => void
+  setAccessEnabled: (id: string, enabled: boolean) => Promise<void>
   addResults: (results: MockResult[]) => void
   setPendingQuestions: (questions: TeacherQuestion[]) => void
 }

@@ -10,6 +10,7 @@ public class ExamQuestion {
     private String questionType; // "SINGLE" (choix unique) or "MULTIPLE" (choix multiples)
     private String explanation;
     private int orderIndex;
+    private double points = 1;
     private List<QuestionOption> options = new ArrayList<>();
 
     public ExamQuestion() {}
@@ -60,6 +61,14 @@ public class ExamQuestion {
 
     public void setOrderIndex(int orderIndex) {
         this.orderIndex = orderIndex;
+    }
+
+    public double getPoints() {
+        return points;
+    }
+
+    public void setPoints(double points) {
+        this.points = points;
     }
 
     public List<QuestionOption> getOptions() {

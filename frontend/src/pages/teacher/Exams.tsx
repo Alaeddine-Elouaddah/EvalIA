@@ -41,6 +41,7 @@ export function Exams() {
   const [codeTarget, setCodeTarget] = useState<TeacherExam | null>(null)
   const [accessTarget, setAccessTarget] = useState<TeacherExam | null>(null)
   const [actionError, setActionError] = useState('')
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState('')
 
   const allPrograms = programGroups.flatMap((group) => group.programs.map((program) => ({ value: program.id, label: program.label })))
@@ -64,16 +65,48 @@ export function Exams() {
     }
   }
 
-  async function confirmRegenerateCode() {
-    if (!codeTarget) return
+  function errorMessage(error: unknown, fallback: string) {
+    return error instanceof Error && error.message ? error.message : fallback
+  }
+
+  async function runAction(key: string, action: () => Promise<void>, fallback: string): Promise<boolean> {
+    setPendingAction(key)
+    setActionError('')
     try {
-      await regenerateExamCode(codeTarget.id)
-      setCodeTarget(null)
-      setActionError('')
+      await action()
+      return true
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Impossible de régénérer le code.')
+      setActionError(errorMessage(error, fallback))
+      return false
+    } finally {
+      setPendingAction(null)
     }
   }
+
+  async function confirmRegenerateCode() {
+    if (!codeTarget) return
+    const target = codeTarget
+    const success = await runAction('code', () => regenerateExamCode(target.id).then(() => undefined), 'Impossible de régénérer le code.')
+    if (success) setCodeTarget(null)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    const target = deleteTarget
+    const success = await runAction('delete', () => deleteExam(target.id), "Impossible de supprimer l'examen.")
+    if (success) setDeleteTarget(null)
+  }
+
+  async function updateAccess(target: TeacherExam, enabled: boolean) {
+    const success = await runAction('access', () => setAccessEnabled(target.id, enabled), "Impossible de modifier l'accès à l'examen.")
+    if (success) setAccessTarget(null)
+  }
+
+  async function duplicate(exam: TeacherExam) {
+    await runAction('duplicate', () => duplicateExam(exam.id), "Impossible de dupliquer l'examen.")
+  }
+
+  const isBusy = pendingAction !== null
 
   return (
     <>
@@ -173,14 +206,14 @@ export function Exams() {
                       <div className="flex justify-end gap-1 transition-opacity sm:opacity-55 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                         <button type="button" onClick={() => setSelected(exam)} aria-label={`Voir ${exam.title}`} title="Voir" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Eye className="h-4 w-4" /></button>
                         <button type="button" onClick={() => editExam(exam)} aria-label={`Modifier ${exam.title}`} title="Modifier" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => duplicateExam(exam.id)} aria-label={`Dupliquer ${exam.title}`} title="Dupliquer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Copy className="h-4 w-4" /></button>
+                        <button type="button" disabled={isBusy} onClick={() => void duplicate(exam)} aria-label={`Dupliquer ${exam.title}`} title="Dupliquer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"><Copy className="h-4 w-4" /></button>
                         {exam.accessCode && exam.status === 'published' && (
                           <>
-                            <button type="button" onClick={() => { setCodeTarget(exam); setActionError('') }} aria-label={`Régénérer le code de ${exam.title}`} title="Régénérer le code" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-accent-soft hover:text-accent-strong"><KeyRound className="h-4 w-4" /></button>
-                            <button type="button" onClick={() => exam.accessEnabled ? setAccessTarget(exam) : setAccessEnabled(exam.id, true)} aria-label={exam.accessEnabled ? `Désactiver l’accès à ${exam.title}` : `Réactiver l’accès à ${exam.title}`} title={exam.accessEnabled ? 'Désactiver l’accès' : 'Réactiver l’accès'} className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-danger-soft hover:text-danger"><ShieldOff className="h-4 w-4" /></button>
+                            <button type="button" disabled={isBusy} onClick={() => { setCodeTarget(exam); setActionError('') }} aria-label={`Régénérer le code de ${exam.title}`} title="Régénérer le code" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-accent-soft hover:text-accent-strong disabled:cursor-not-allowed disabled:opacity-40"><KeyRound className="h-4 w-4" /></button>
+                            <button type="button" disabled={isBusy} onClick={() => { if (exam.accessEnabled) { setAccessTarget(exam); setActionError('') } else { void updateAccess(exam, true) } }} aria-label={exam.accessEnabled ? `Désactiver l’accès à ${exam.title}` : `Réactiver l’accès à ${exam.title}`} title={exam.accessEnabled ? 'Désactiver l’accès' : 'Réactiver l’accès'} className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-danger-soft hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"><ShieldOff className="h-4 w-4" /></button>
                           </>
                         )}
-                        <button type="button" onClick={() => setDeleteTarget(exam)} aria-label={`Supprimer ${exam.title}`} title="Supprimer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-danger-soft hover:text-danger"><Trash2 className="h-4 w-4" /></button>
+                        <button type="button" disabled={isBusy} onClick={() => { setDeleteTarget(exam); setActionError('') }} aria-label={`Supprimer ${exam.title}`} title="Supprimer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-danger-soft hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
                   </m.tr>
@@ -202,15 +235,15 @@ export function Exams() {
         )}
       </Modal>
 
-      <Modal open={Boolean(codeTarget)} onClose={() => setCodeTarget(null)} title="Régénérer le code d’accès ?" description="L’ancien code cessera immédiatement de fonctionner." footer={<><Button variant="secondary" onClick={() => setCodeTarget(null)}>Annuler</Button><Button onClick={confirmRegenerateCode}>Régénérer le code</Button></>}>
+      <Modal open={Boolean(codeTarget)} onClose={() => setCodeTarget(null)} title="Régénérer le code d’accès ?" description="L’ancien code cessera immédiatement de fonctionner." footer={<><Button variant="secondary" disabled={isBusy} onClick={() => setCodeTarget(null)}>Annuler</Button><Button loading={pendingAction === 'code'} disabled={isBusy} onClick={() => void confirmRegenerateCode()}>Régénérer le code</Button></>}>
         <p className="text-sm text-muted">Un nouveau code unique sera créé pour « {codeTarget?.title} ».</p>
       </Modal>
 
-      <Modal open={Boolean(accessTarget)} onClose={() => setAccessTarget(null)} title="Désactiver l’accès ?" description="Les étudiants ne pourront plus rejoindre cet examen avec son code." footer={<><Button variant="secondary" onClick={() => setAccessTarget(null)}>Annuler</Button><Button variant="danger" onClick={() => { if (accessTarget) setAccessEnabled(accessTarget.id, false); setAccessTarget(null) }}>Désactiver l’accès</Button></>}>
+      <Modal open={Boolean(accessTarget)} onClose={() => setAccessTarget(null)} title="Désactiver l’accès ?" description="Les étudiants ne pourront plus rejoindre cet examen avec son code." footer={<><Button variant="secondary" disabled={isBusy} onClick={() => setAccessTarget(null)}>Annuler</Button><Button variant="danger" loading={pendingAction === 'access'} disabled={isBusy} onClick={() => { if (accessTarget) void updateAccess(accessTarget, false) }}>Désactiver l’accès</Button></>}>
         <p className="text-sm text-muted">Tu pourras réactiver l’accès plus tard.</p>
       </Modal>
 
-      <Modal open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Supprimer cet examen ?" description="Cette action supprimera l’examen des données de démonstration." footer={<><Button variant="secondary" onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" icon={<Trash2 className="h-4 w-4" />} onClick={() => { if (deleteTarget) deleteExam(deleteTarget.id); setDeleteTarget(null) }}>Supprimer</Button></>}>
+      <Modal open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Supprimer cet examen ?" description="Cette action supprimera définitivement cet examen, ses questions et les tentatives associées." footer={<><Button variant="secondary" disabled={isBusy} onClick={() => setDeleteTarget(null)}>Annuler</Button><Button variant="danger" icon={<Trash2 className="h-4 w-4" />} loading={pendingAction === 'delete'} disabled={isBusy} onClick={() => void confirmDelete()}>Supprimer</Button></>}>
         <p className="text-sm text-muted">{deleteTarget?.title}</p>
       </Modal>
     </>

@@ -22,6 +22,7 @@ export type ExamLanguage = 'fr' | 'en'
 export interface TeacherExam {
   id: string
   title: string
+  description?: string | null
   subject: string
   durationMinutes: number
   date: string
@@ -36,6 +37,7 @@ export interface TeacherExam {
   questions: TeacherQuestion[]
   revealResults?: boolean
   randomizeQuestions?: boolean
+  accessMode?: 'code' | 'direct'
 }
 
 export interface MockStudent {

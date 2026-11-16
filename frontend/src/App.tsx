@@ -47,20 +47,22 @@ function AppContent() {
 
   if (currentUser?.role === 'TEACHER') {
     return (
-      <Routes>
-          <Route path="/teacher" element={<AppLayout user={currentUser} onLogout={handleLogout} />}>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="exams" element={<Exams />} />
-            <Route path="exams/create" element={<CreateExam />} />
-            <Route path="ai-generator" element={<AiGenerator />} />
-            <Route path="questions" element={<Questions />} />
-            <Route path="students" element={<Students />} />
-            <Route path="results" element={<Results />} />
-            <Route path="profile" element={<ProfilePage user={currentUser} onUpdated={setCurrentUser} />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/teacher/dashboard" replace />} />
-      </Routes>
+      <TeacherDataProvider role="TEACHER">
+        <Routes>
+            <Route path="/teacher" element={<AppLayout user={currentUser} onLogout={handleLogout} />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="exams" element={<Exams />} />
+              <Route path="exams/create" element={<CreateExam />} />
+              <Route path="ai-generator" element={<AiGenerator />} />
+              <Route path="questions" element={<Questions />} />
+              <Route path="students" element={<Students />} />
+              <Route path="results" element={<Results />} />
+              <Route path="profile" element={<ProfilePage user={currentUser} onUpdated={setCurrentUser} />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/teacher/dashboard" replace />} />
+        </Routes>
+      </TeacherDataProvider>
     )
   }
 
@@ -89,29 +91,29 @@ function AppContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-sky-50 via-white to-blue-50 text-ink">
-      <Navbar
-        user={currentUser}
-        currentView={currentView}
-        onNavigate={setCurrentView}
-        onLogout={handleLogout}
-      />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        {renderView()}
-      </main>
-      <footer className="border-t border-slate-200/70 bg-white/75 py-5 text-center text-xs text-muted backdrop-blur-xl">
-        EvalIA · ENSIASD · Plateforme d’évaluation académique
-      </footer>
-    </div>
+    <TeacherDataProvider role={currentUser?.role ?? null}>
+      <div className="flex min-h-screen flex-col bg-gradient-to-br from-sky-50 via-white to-blue-50 text-ink">
+        <Navbar
+          user={currentUser}
+          currentView={currentView}
+          onNavigate={setCurrentView}
+          onLogout={handleLogout}
+        />
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          {renderView()}
+        </main>
+        <footer className="border-t border-slate-200/70 bg-white/75 py-5 text-center text-xs text-muted backdrop-blur-xl">
+          EvalIA · ENSIASD · Plateforme d’évaluation académique
+        </footer>
+      </div>
+    </TeacherDataProvider>
   )
 }
 
 function App() {
   return (
     <BrowserRouter>
-      <TeacherDataProvider>
-        <AppContent />
-      </TeacherDataProvider>
+      <AppContent />
     </BrowserRouter>
   )
 }

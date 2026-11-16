@@ -20,6 +20,24 @@ CREATE TABLE IF NOT EXISTS exams (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Migration additive (Phase 1) : métadonnées produit des examens.
+-- Idempotente et non destructive : aucune colonne ni donnée n'est supprimée.
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS subject VARCHAR(120);
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'published';
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS access_code VARCHAR(6);
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS access_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS opens_at TIMESTAMP;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS language VARCHAR(2) DEFAULT 'fr';
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS mode VARCHAR(10) DEFAULT 'manual';
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS targets TEXT[];
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS reveal_results BOOLEAN DEFAULT TRUE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS randomize_questions BOOLEAN DEFAULT FALSE;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS access_mode VARCHAR(10) DEFAULT 'code' CHECK (access_mode IN ('code', 'direct'));
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_exams_access_code
+    ON exams(access_code) WHERE access_code IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS exam_questions (
     id BIGSERIAL PRIMARY KEY,
     exam_id BIGINT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
@@ -28,6 +46,9 @@ CREATE TABLE IF NOT EXISTS exam_questions (
     explanation TEXT,
     order_index INTEGER NOT NULL
 );
+
+-- Migration additive (Phase 1) : barème par question.
+ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS points NUMERIC(4,1) DEFAULT 1;
 
 CREATE TABLE IF NOT EXISTS question_options (
     id BIGSERIAL PRIMARY KEY,
