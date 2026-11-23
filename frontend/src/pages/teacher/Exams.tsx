@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { m } from 'framer-motion'
-import { ArrowDownUp, Clock3, Copy, Eye, KeyRound, Pencil, Plus, Search, ShieldOff, Trash2 } from 'lucide-react'
+import { ArrowDownUp, Clock3, Copy, Download, Eye, KeyRound, Pencil, Plus, Search, ShieldOff, Trash2 } from 'lucide-react'
+import { jsPDF } from 'jspdf'
 import { useNavigate } from 'react-router-dom'
 import { useTeacherData } from '../../data/useTeacherData'
 import { programGroups } from '../../data/programs.js'
@@ -106,6 +107,106 @@ export function Exams() {
     await runAction('duplicate', () => duplicateExam(exam.id), "Impossible de dupliquer l'examen.")
   }
 
+  function exportExamPdf(exam: TeacherExam) {
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 42
+    const contentWidth = pageWidth - margin * 2
+    let y = 42
+
+    const ensureSpace = (height: number) => {
+      if (y + height > pageHeight - 42) {
+        pdf.addPage()
+        y = 42
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(9)
+        pdf.setTextColor(100)
+        pdf.text('Suite de l’examen', margin, y)
+        y += 24
+        pdf.setTextColor(30)
+      }
+    }
+
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(19)
+    pdf.setTextColor(25, 42, 82)
+    pdf.text('EVALIA - ENSIASD', margin, y)
+    y += 26
+
+    pdf.setFontSize(15)
+    pdf.text(exam.title, margin, y)
+    y += 22
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    pdf.setTextColor(70)
+    pdf.text(`Matière : ${exam.subject || 'Non renseignée'}`, margin, y)
+    pdf.text(`Durée : ${exam.durationMinutes} minutes`, margin + contentWidth - 130, y)
+    y += 17
+    pdf.text(`Date : ${formatDate(exam.date)}${exam.openTime ? ` à ${exam.openTime}` : ''}`, margin, y)
+    pdf.text(`Code : ${exam.accessCode ?? 'Sans code'}`, margin + contentWidth - 130, y)
+    y += 19
+
+    pdf.setDrawColor(190, 198, 210)
+    pdf.line(margin, y, pageWidth - margin, y)
+    y += 18
+
+    pdf.setTextColor(30)
+    pdf.setFontSize(10)
+    pdf.text('Nom : ______________________________________', margin, y)
+    pdf.text('Prénom : ___________________________________', margin + contentWidth / 2, y)
+    y += 22
+    pdf.text('Filière / Groupe : __________________________', margin, y)
+    pdf.text('Code étudiant : _____________________________', margin + contentWidth / 2, y)
+    y += 28
+
+    exam.questions.forEach((question, questionIndex) => {
+      ensureSpace(100)
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.setTextColor(30)
+      const questionLines = pdf.splitTextToSize(
+        `${questionIndex + 1}. ${question.text}`,
+        contentWidth,
+      )
+      pdf.text(questionLines, margin, y)
+      y += questionLines.length * 14 + 8
+
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      question.options.forEach((option, optionIndex) => {
+        ensureSpace(32)
+        const checkboxX = margin + 2
+        const checkboxY = y - 8
+        pdf.setDrawColor(80)
+        pdf.rect(checkboxX, checkboxY, 10, 10)
+
+        const optionLetter = String.fromCharCode(65 + optionIndex)
+        const optionLines = pdf.splitTextToSize(
+          `${optionLetter}. ${option.text}`,
+          contentWidth - 28,
+        )
+        pdf.text(optionLines, margin + 20, y)
+        y += Math.max(17, optionLines.length * 13 + 4)
+      })
+      y += 10
+    })
+
+    ensureSpace(60)
+    pdf.setFont('helvetica', 'italic')
+    pdf.setFontSize(9)
+    pdf.setTextColor(100)
+    pdf.text('Fin de l’examen', margin, y)
+
+    const safeTitle = exam.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '')
+    pdf.save(`evalia-${safeTitle || 'examen'}-imprimable.pdf`)
+  }
+
   const isBusy = pendingAction !== null
 
   return (
@@ -206,6 +307,16 @@ export function Exams() {
                       <div className="flex justify-end gap-1 transition-opacity sm:opacity-55 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                         <button type="button" onClick={() => setSelected(exam)} aria-label={`Voir ${exam.title}`} title="Voir" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Eye className="h-4 w-4" /></button>
                         <button type="button" onClick={() => editExam(exam)} aria-label={`Modifier ${exam.title}`} title="Modifier" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                        <button
+                          type="button"
+                          onClick={() => exportExamPdf(exam)}
+                          aria-label={`Exporter ${exam.title} en PDF imprimable`}
+                          title="Exporter PDF imprimable"
+                          disabled={exam.questions.length === 0}
+                          className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
                         <button type="button" disabled={isBusy} onClick={() => void duplicate(exam)} aria-label={`Dupliquer ${exam.title}`} title="Dupliquer" className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition hover:bg-primary-50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"><Copy className="h-4 w-4" /></button>
                         {exam.accessCode && exam.status === 'published' && (
                           <>

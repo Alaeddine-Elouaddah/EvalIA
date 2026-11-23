@@ -102,6 +102,17 @@ export interface ExamAttemptDTO {
   totalQuestions: number
   score: number
   submittedAt: string
+  startedAt?: string
+  integrityScore?: number
+  violationCount?: number
+  violationLog?: string
+}
+
+export interface ExamAttemptPayload {
+  answers: number[][]
+  startedAtTimestamp?: number
+  violationCount?: number
+  violations?: string[]
 }
 
 export interface TeacherStudentDTO {
@@ -111,6 +122,17 @@ export interface TeacherStudentDTO {
   attemptCount: number
   examsTaken: number
   averageScore: number
+}
+
+export interface TeacherViolationDTO {
+  id: number
+  examId: number
+  examTitle: string
+  studentId: number
+  studentName: string
+  studentEmail: string
+  reason: string
+  detectedAt: string
 }
 
 export type AppView =

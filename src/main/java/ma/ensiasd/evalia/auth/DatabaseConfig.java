@@ -102,11 +102,29 @@ public class DatabaseConfig {
                     correct_count INTEGER NOT NULL,
                     total_questions INTEGER NOT NULL,
                     score NUMERIC(5, 2) NOT NULL,
-                    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    integrity_score INTEGER DEFAULT 100,
+                    violation_count INTEGER DEFAULT 0,
+                    violation_log TEXT
                 )
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_student ON exam_attempts(exam_id, student_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_attempts_submitted_at ON exam_attempts(submitted_at)");
+            stmt.execute("ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+            stmt.execute("ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS integrity_score INTEGER DEFAULT 100");
+            stmt.execute("ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS violation_count INTEGER DEFAULT 0");
+            stmt.execute("ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS violation_log TEXT");
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exam_violations (
+                    id BIGSERIAL PRIMARY KEY,
+                    exam_id BIGINT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+                    student_id BIGINT NOT NULL REFERENCES evalia_users(id) ON DELETE CASCADE,
+                    reason TEXT NOT NULL,
+                    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_violations_exam_student ON exam_violations(exam_id, student_id)");
 
             // ------------------------------------------------------------------
             // Migration additive et non destructive : métadonnées produit des examens.

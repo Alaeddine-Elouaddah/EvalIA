@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Loader2, Search, Trophy } from 'lucide-react'
+import { Loader2, Search, Trophy, ShieldAlert, Eye } from 'lucide-react'
 import { fetchTeacherGrades } from '../api/exam'
 import type { ExamAttemptDTO } from '../types'
+import { CheatingReportModal } from './CheatingReportModal'
 
 function formatDate(value: string) {
   const date = new Date(value.replace(' ', 'T').replace(/(\.\d{3})\d+$/, '$1'))
@@ -17,6 +18,7 @@ export const TeacherGradesPage: React.FC = () => {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptDTO | null>(null)
 
   useEffect(() => {
     let active = true
@@ -99,7 +101,9 @@ export const TeacherGradesPage: React.FC = () => {
                   <th scope="col" className="px-5 py-3 font-semibold">Examen</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Résultat</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Note</th>
+                  <th scope="col" className="px-5 py-3 font-semibold">Intégrité</th>
                   <th scope="col" className="px-5 py-3 font-semibold">Date</th>
+                  <th scope="col" className="px-5 py-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -114,7 +118,35 @@ export const TeacherGradesPage: React.FC = () => {
                     <td className="px-5 py-4 font-bold text-indigo-700">
                       {grade.score.toLocaleString('fr-FR')}%
                     </td>
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAttempt(grade)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition hover:opacity-85 ${
+                          ((grade.integrityScore ?? 100) >= 80 && (grade.violationCount ?? 0) === 0)
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            : (grade.integrityScore ?? 100) >= 50
+                            ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                            : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                        }`}
+                        title="Cliquer pour voir le détail des infractions"
+                      >
+                        <ShieldAlert className="h-3.5 w-3.5" />
+                        {grade.integrityScore ?? 100}%
+                        {(grade.violationCount ?? 0) > 0 && ` (${grade.violationCount} inf.)`}
+                      </button>
+                    </td>
                     <td className="px-5 py-4 text-xs text-slate-500">{formatDate(grade.submittedAt)}</td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAttempt(grade)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:text-indigo-600"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Rapport anti-triche
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -122,6 +154,11 @@ export const TeacherGradesPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <CheatingReportModal
+        attempt={selectedAttempt}
+        onClose={() => setSelectedAttempt(null)}
+      />
     </section>
   )
 }

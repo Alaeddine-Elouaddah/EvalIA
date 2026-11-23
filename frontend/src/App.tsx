@@ -34,7 +34,14 @@ function AppContent() {
     if (user.role === 'TEACHER') {
       navigate('/teacher/dashboard', { replace: true })
     } else {
-      setCurrentView(window.location.pathname === '/student/join' ? 'student_join_exam' : 'generator')
+      const code = new URLSearchParams(window.location.search).get('code')
+      if (window.location.pathname === '/student/join') {
+        setCurrentView('student_join_exam')
+        navigate(code ? `/student/join?code=${encodeURIComponent(code)}` : '/student/join', { replace: true })
+      } else {
+        setCurrentView('generator')
+        navigate('/student/exams', { replace: true })
+      }
     }
   }
 
@@ -63,6 +70,69 @@ function AppContent() {
             <Route path="*" element={<Navigate to="/teacher/dashboard" replace />} />
         </Routes>
       </TeacherDataProvider>
+    )
+  }
+
+  if (!currentUser) {
+    function PublicJoinGate() {
+      const [mode, setMode] = useState<'register' | 'login'>('register')
+      const code = new URLSearchParams(window.location.search).get('code')
+
+      if (mode === 'login') {
+        return (
+          <LoginPage
+            onSuccess={handleAuthSuccess}
+            onNavigate={(view) => {
+              if (view === 'register') setMode('register')
+              if (view === 'home') navigate('/', { replace: true })
+            }}
+          />
+        )
+      }
+
+      return (
+        <div>
+          {code && (
+            <div className="mx-auto max-w-6xl px-4 pt-5 text-center sm:px-6">
+              <p className="inline-flex rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-bold text-primary">
+                Invitation examen · Code {code}
+              </p>
+            </div>
+          )}
+          <RegisterPage
+            onSuccess={handleAuthSuccess}
+            onNavigate={(view) => {
+              if (view === 'login') setMode('login')
+              if (view === 'home') navigate('/', { replace: true })
+            }}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <Routes>
+        <Route path="/student/join" element={<PublicJoinGate />} />
+        <Route path="/login" element={
+          <LoginPage
+            onSuccess={handleAuthSuccess}
+            onNavigate={(view) => {
+              if (view === 'register') navigate('/register', { replace: true })
+              if (view === 'home') navigate('/', { replace: true })
+            }}
+          />
+        } />
+        <Route path="/register" element={
+          <RegisterPage
+            onSuccess={handleAuthSuccess}
+            onNavigate={(view) => {
+              if (view === 'login') navigate('/login', { replace: true })
+              if (view === 'home') navigate('/', { replace: true })
+            }}
+          />
+        } />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     )
   }
 

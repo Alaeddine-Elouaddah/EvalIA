@@ -24,6 +24,45 @@ public class ExamRepository {
     private static final SecureRandom CODE_RANDOM = new SecureRandom();
     private static final DateTimeFormatter OPENS_AT_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
 
+    public void createViolation(Long examId, Long studentId, String reason) {
+        String sql = """
+            INSERT INTO exam_violations (exam_id, student_id, reason)
+            VALUES (?, ?, ?)
+            """;
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, examId);
+            ps.setLong(2, studentId);
+            ps.setString(3, reason);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors de l'enregistrement de l'infraction: " + e.getMessage(), e);
+        }
+    }
+
+    public List<String> findViolationLog(Long examId, Long studentId) {
+        String sql = """
+            SELECT reason
+            FROM exam_violations
+            WHERE exam_id = ? AND student_id = ?
+            ORDER BY detected_at ASC, id ASC
+            """;
+        List<String> violations = new ArrayList<>();
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, examId);
+            ps.setLong(2, studentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    violations.add(rs.getString("reason"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors du chargement des infractions: " + e.getMessage(), e);
+        }
+        return violations;
+    }
+
     /** Colonnes d'examen + participants calculés (alias de table obligatoire : "e"). */
     private static final String EXAM_SELECT = """
             e.id, e.title, e.description, e.teacher_id, e.teacher_name, e.created_at,
@@ -85,10 +124,26 @@ public class ExamRepository {
             int totalQuestions,
             double score,
             String examTitle) {
+        return createAttempt(examId, studentId, studentName, studentEmail, correctCount, totalQuestions, score, examTitle, null, 100, 0, null);
+    }
+
+    public ExamAttemptDTO createAttempt(
+            Long examId,
+            Long studentId,
+            String studentName,
+            String studentEmail,
+            int correctCount,
+            int totalQuestions,
+            double score,
+            String examTitle,
+            Timestamp startedAt,
+            int integrityScore,
+            int violationCount,
+            String violationLog) {
         String sql = """
-            INSERT INTO exam_attempts (exam_id, student_id, correct_count, total_questions, score)
-            VALUES (?, ?, ?, ?, ?)
-            RETURNING id, submitted_at
+            INSERT INTO exam_attempts (exam_id, student_id, correct_count, total_questions, score, started_at, integrity_score, violation_count, violation_log)
+            VALUES (?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?)
+            RETURNING id, submitted_at, started_at
             """;
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -97,6 +152,10 @@ public class ExamRepository {
             ps.setInt(3, correctCount);
             ps.setInt(4, totalQuestions);
             ps.setBigDecimal(5, BigDecimal.valueOf(score));
+            ps.setTimestamp(6, startedAt);
+            ps.setInt(7, integrityScore);
+            ps.setInt(8, violationCount);
+            ps.setString(9, violationLog);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return new ExamAttemptDTO(
@@ -108,7 +167,11 @@ public class ExamRepository {
                         correctCount,
                         totalQuestions,
                         score,
-                        rs.getString("submitted_at")
+                        rs.getString("submitted_at"),
+                        rs.getString("started_at"),
+                        integrityScore,
+                        violationCount,
+                        violationLog
                     );
                 }
             }
@@ -121,7 +184,23 @@ public class ExamRepository {
     public List<ExamAttemptDTO> findStudentAttempts(Long studentId) {
         String sql = """
             SELECT a.id, a.exam_id, e.title AS exam_title, u.name AS student_name, u.email AS student_email,
-                   a.correct_count, a.total_questions, a.score, a.submitted_at
+                   a.correct_count, a.total_questions, a.score, a.submitted_at,
+                   a.started_at,
+                   GREATEST(0, 100 - (COALESCE((
+                       SELECT COUNT(*)
+                       FROM exam_violations v
+                       WHERE v.exam_id = a.exam_id AND v.student_id = a.student_id
+                   ), 0)::INTEGER * 15)) AS integrity_score,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM exam_violations v
+                       WHERE v.exam_id = a.exam_id AND v.student_id = a.student_id
+                   ), 0) AS violation_count,
+                   (
+                       SELECT STRING_AGG(v.reason, ' | ' ORDER BY v.detected_at, v.id)
+                       FROM exam_violations v
+                       WHERE v.exam_id = a.exam_id AND v.student_id = a.student_id
+                   ) AS violation_log
             FROM exam_attempts a
             JOIN exams e ON e.id = a.exam_id
             JOIN evalia_users u ON u.id = a.student_id
@@ -134,7 +213,23 @@ public class ExamRepository {
     public List<ExamAttemptDTO> findTeacherGrades(Long teacherId) {
         String sql = """
             SELECT a.id, a.exam_id, e.title AS exam_title, u.name AS student_name, u.email AS student_email,
-                   a.correct_count, a.total_questions, a.score, a.submitted_at
+                   a.correct_count, a.total_questions, a.score, a.submitted_at,
+                   a.started_at,
+                   GREATEST(0, 100 - (COALESCE((
+                       SELECT COUNT(*)
+                       FROM exam_violations v
+                       WHERE v.exam_id = a.exam_id AND v.student_id = a.student_id
+                   ), 0)::INTEGER * 15)) AS integrity_score,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM exam_violations v
+                       WHERE v.exam_id = a.exam_id AND v.student_id = a.student_id
+                   ), 0) AS violation_count,
+                   (
+                       SELECT STRING_AGG(v.reason, ' | ' ORDER BY v.detected_at, v.id)
+                       FROM exam_violations v
+                       WHERE v.exam_id = a.exam_id AND v.student_id = a.student_id
+                   ) AS violation_log
             FROM exam_attempts a
             JOIN exams e ON e.id = a.exam_id
             JOIN evalia_users u ON u.id = a.student_id
@@ -144,6 +239,41 @@ public class ExamRepository {
         return findAttempts(sql, teacherId);
     }
 
+    public List<TeacherViolationDTO> findTeacherViolations(Long teacherId) {
+        String sql = """
+            SELECT v.id, v.exam_id, e.title AS exam_title,
+                   v.student_id, u.name AS student_name, u.email AS student_email,
+                   v.reason, v.detected_at
+            FROM exam_violations v
+            JOIN exams e ON e.id = v.exam_id
+            JOIN evalia_users u ON u.id = v.student_id
+            WHERE e.teacher_id = ?
+            ORDER BY v.detected_at DESC, v.id DESC
+            """;
+        List<TeacherViolationDTO> violations = new ArrayList<>();
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, teacherId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    violations.add(new TeacherViolationDTO(
+                        rs.getLong("id"),
+                        rs.getLong("exam_id"),
+                        rs.getString("exam_title"),
+                        rs.getLong("student_id"),
+                        rs.getString("student_name"),
+                        rs.getString("student_email"),
+                        rs.getString("reason"),
+                        rs.getString("detected_at")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur lors du chargement des infractions: " + e.getMessage(), e);
+        }
+        return violations;
+    }
+
     private List<ExamAttemptDTO> findAttempts(String sql, Long ownerId) {
         List<ExamAttemptDTO> attempts = new ArrayList<>();
         try (Connection conn = DatabaseConfig.getConnection();
@@ -151,16 +281,38 @@ public class ExamRepository {
             ps.setLong(1, ownerId);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
+                    Long examId = rs.getLong("exam_id");
+                    Long studentId = findStudentId(conn, rs.getLong("id"));
+                    int integrityScore = rs.getInt("integrity_score");
+                    if (rs.wasNull()) integrityScore = 100;
+                    int violationCount = rs.getInt("violation_count");
+                    if (rs.wasNull()) violationCount = 0;
+                    String violationLog = rs.getString("violation_log");
+
+                    List<String> persistentViolations =
+                        findViolationLog(conn, examId, studentId);
+                    if (!persistentViolations.isEmpty()) {
+                        violationCount = Math.max(violationCount,
+                            persistentViolations.size());
+                        integrityScore = Math.max(0,
+                            100 - (violationCount * 15));
+                        violationLog = String.join(" | ", persistentViolations);
+                    }
+
                     attempts.add(new ExamAttemptDTO(
                         rs.getLong("id"),
-                        rs.getLong("exam_id"),
+                        examId,
                         rs.getString("exam_title"),
                         rs.getString("student_name"),
                         rs.getString("student_email"),
                         rs.getInt("correct_count"),
                         rs.getInt("total_questions"),
                         rs.getDouble("score"),
-                        rs.getString("submitted_at")
+                        rs.getString("submitted_at"),
+                        rs.getString("started_at"),
+                        integrityScore,
+                        violationCount,
+                        violationLog
                     ));
                 }
             }
@@ -168,6 +320,40 @@ public class ExamRepository {
             throw new RuntimeException("Erreur lors du chargement des notes: " + e.getMessage(), e);
         }
         return attempts;
+    }
+
+    private Long findStudentId(Connection conn, Long attemptId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT student_id FROM exam_attempts WHERE id = ?")) {
+            ps.setLong(1, attemptId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong("student_id") : null;
+            }
+        }
+    }
+
+    private List<String> findViolationLog(
+            Connection conn,
+            Long examId,
+            Long studentId) throws SQLException {
+        if (studentId == null) return List.of();
+        String sql = """
+            SELECT reason
+            FROM exam_violations
+            WHERE exam_id = ? AND student_id = ?
+            ORDER BY detected_at ASC, id ASC
+            """;
+        List<String> violations = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, examId);
+            ps.setLong(2, studentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    violations.add(rs.getString("reason"));
+                }
+            }
+        }
+        return violations;
     }
 
     public List<TeacherStudentDTO> findTeacherStudents(Long teacherId) {

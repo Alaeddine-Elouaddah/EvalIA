@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.LinkedHashSet;
 
 @Path("/exams")
 @Produces(MediaType.APPLICATION_JSON)
@@ -90,6 +91,14 @@ public class ExamResource {
     }
 
     @GET
+    @Path("/violations")
+    public Response getTeacherViolations(@HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader) {
+        Claims claims = authenticateTeacher(authHeader);
+        Long teacherId = claims.get("userId", Long.class);
+        return Response.ok(examRepository.findTeacherViolations(teacherId)).build();
+    }
+
+    @GET
     @Path("/{id}/student")
     public Response getExamForStudent(
             @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
@@ -139,6 +148,28 @@ public class ExamResource {
     }
 
     @POST
+    @Path("/{id}/violations")
+    public Response reportViolation(
+            @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
+            @PathParam("id") Long id,
+            Map<String, String> body) {
+        Claims claims = authenticateStudent(authHeader);
+        if (!examRepository.findById(id).isPresent()) {
+            return notFound("Examen introuvable");
+        }
+        String reason = body == null ? null : body.get("reason");
+        if (reason == null || reason.isBlank()) {
+            return badRequest("La raison de l'infraction est obligatoire");
+        }
+        examRepository.createViolation(
+                id,
+                claims.get("userId", Long.class),
+                reason.trim()
+        );
+        return Response.status(Response.Status.CREATED).build();
+    }
+
+    @POST
     @Path("/{id}/attempts")
     public Response submitAttempt(
             @HeaderParam(HttpHeaders.AUTHORIZATION) String authHeader,
@@ -153,6 +184,22 @@ public class ExamResource {
         }
 
         Exam exam = examOpt.get();
+
+        // Vérification de la deadline serveur si durationMinutes est défini
+        java.sql.Timestamp startedAt = null;
+        if (request != null && request.getStartedAtTimestamp() != null && request.getStartedAtTimestamp() > 0) {
+            startedAt = new java.sql.Timestamp(request.getStartedAtTimestamp());
+            if (exam.getDurationMinutes() != null && exam.getDurationMinutes() > 0) {
+                long now = System.currentTimeMillis();
+                long maxAllowedTimeMs = request.getStartedAtTimestamp() + (exam.getDurationMinutes() * 60L * 1000L) + (60L * 1000L); // +60s de tolérance réseau
+                if (now > maxAllowedTimeMs) {
+                    return Response.status(Response.Status.BAD_REQUEST)
+                            .entity(Map.of("error", "Le temps alloué pour cet examen est expiré (délai dépassé)"))
+                            .build();
+                }
+            }
+        }
+
         List<ExamQuestion> questions = exam.getQuestions();
         if (questions.isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -193,6 +240,26 @@ public class ExamResource {
 
         int totalQuestions = questions.size();
         double score = Math.round(correctCount * 10000.0 / totalQuestions) / 100.0;
+
+        // L'intégrité est recalculée côté serveur à partir du journal persistant,
+        // pas uniquement à partir du compteur conservé dans le navigateur.
+        Long studentId = claims.get("userId", Long.class);
+        LinkedHashSet<String> violationEntries = new LinkedHashSet<>();
+        violationEntries.addAll(examRepository.findViolationLog(id, studentId));
+        if (request != null && request.getViolations() != null) {
+            violationEntries.addAll(request.getViolations());
+        }
+        int payloadViolationCount = request != null && request.getViolationCount() != null
+                ? Math.max(0, request.getViolationCount())
+                : 0;
+        int violationCount = Math.max(payloadViolationCount, violationEntries.size());
+        // Chaque violation retire 15 points d'intégrité (min 0)
+        int integrityScore = Math.max(0, 100 - (violationCount * 15));
+        String violationLog = null;
+        if (!violationEntries.isEmpty()) {
+            violationLog = String.join(" | ", violationEntries);
+        }
+
         ExamAttemptDTO result = examRepository.createAttempt(
                 id,
                 claims.get("userId", Long.class),
@@ -201,7 +268,11 @@ public class ExamResource {
                 correctCount,
                 totalQuestions,
                 score,
-                exam.getTitle()
+                exam.getTitle(),
+                startedAt,
+                integrityScore,
+                violationCount,
+                violationLog
         );
         return Response.status(Response.Status.CREATED).entity(result).build();
     }

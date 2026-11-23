@@ -65,8 +65,29 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
     correct_count INTEGER NOT NULL,
     total_questions INTEGER NOT NULL,
     score NUMERIC(5, 2) NOT NULL,
-    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    integrity_score INTEGER DEFAULT 100,
+    violation_count INTEGER DEFAULT 0,
+    violation_log TEXT
 );
+
+-- Migration additive pour les colonnes anti-triche
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS integrity_score INTEGER DEFAULT 100;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS violation_count INTEGER DEFAULT 0;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS violation_log TEXT;
+
+CREATE TABLE IF NOT EXISTS exam_violations (
+    id BIGSERIAL PRIMARY KEY,
+    exam_id BIGINT NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+    student_id BIGINT NOT NULL REFERENCES evalia_users(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_exam_violations_exam_student
+    ON exam_violations(exam_id, student_id);
 
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_student ON exam_attempts(exam_id, student_id);
 CREATE INDEX IF NOT EXISTS idx_exam_attempts_submitted_at ON exam_attempts(submitted_at);

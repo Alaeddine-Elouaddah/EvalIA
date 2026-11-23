@@ -1,4 +1,4 @@
-import type { ExamAttemptDTO, ExamDTO, ExamSummary, TeacherStudentDTO } from '../types'
+import type { ExamAttemptDTO, ExamDTO, ExamSummary, TeacherStudentDTO, TeacherViolationDTO } from '../types'
 import { getStoredToken } from './auth'
 
 async function requestJson<T>(url: string, method = 'GET', body?: unknown): Promise<T> {
@@ -84,8 +84,22 @@ export function fetchStudentExam(examId: number): Promise<ExamDTO> {
   return requestJson(`/evalia/api/exams/${examId}/student`)
 }
 
-export function submitExamAttempt(examId: number, answers: number[][]): Promise<ExamAttemptDTO> {
-  return requestJson(`/evalia/api/exams/${examId}/attempts`, 'POST', { answers })
+export function submitExamAttempt(
+  examId: number,
+  answers: number[][],
+  meta?: { startedAtTimestamp?: number; violationCount?: number; violations?: string[] }
+): Promise<ExamAttemptDTO> {
+  const payload = {
+    answers,
+    startedAtTimestamp: meta?.startedAtTimestamp,
+    violationCount: meta?.violationCount,
+    violations: meta?.violations,
+  }
+  return requestJson(`/evalia/api/exams/${examId}/attempts`, 'POST', payload)
+}
+
+export async function reportExamViolation(examId: number, reason: string): Promise<void> {
+  await requestJson(`/evalia/api/exams/${examId}/violations`, 'POST', { reason })
 }
 
 export function fetchMyAttempts(): Promise<ExamAttemptDTO[]> {
@@ -98,6 +112,10 @@ export function fetchTeacherStudents(): Promise<TeacherStudentDTO[]> {
 
 export function fetchTeacherGrades(): Promise<ExamAttemptDTO[]> {
   return requestJson('/evalia/api/exams/grades')
+}
+
+export function fetchTeacherViolations(): Promise<TeacherViolationDTO[]> {
+  return requestJson('/evalia/api/exams/violations')
 }
 
 // ------------------------------------------------------------------

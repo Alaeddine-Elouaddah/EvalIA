@@ -11,12 +11,17 @@ import {
   Clipboard,
   Clock3,
   Copy,
+  Download,
   FileText,
   GripVertical,
   Plus,
   Sparkles,
   Trash2,
+  QrCode,
+  Upload,
 } from 'lucide-react'
+import QRCode from 'qrcode'
+import { jsPDF } from 'jspdf'
 import { useTeacherData } from '../../data/useTeacherData'
 import { ENGLISH_PROGRAM_ID, programGroups } from '../../data/programs.js'
 import type { ExamLanguage, TeacherExam, TeacherQuestion, TeacherQuestionType } from '../../types/teacher'
@@ -24,6 +29,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
+import { Modal } from '../../components/ui/Modal'
 import { Stepper } from '../../components/ui/Stepper'
 import { PageHeader, SelectField } from './shared'
 import { formatDate } from './utils'
@@ -50,6 +56,77 @@ interface ExamDraft {
 
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+interface ImportedQuestionJson {
+  question: string
+  type?: 'single' | 'multiple'
+  options: Array<{
+    text: string
+    isCorrect: boolean
+  }> | string[]
+  explanation?: string
+  points?: number
+}
+
+function parseImportedQuestions(value: unknown): TeacherQuestion[] {
+  const rawQuestions = Array.isArray(value)
+    ? value
+    : typeof value === 'object' && value !== null && 'questions' in value
+      ? (value as { questions: unknown }).questions
+      : null
+
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+    throw new Error('Le JSON doit contenir une liste non vide dans "questions" ou à la racine.')
+  }
+
+  return rawQuestions.map((item, index) => {
+    const raw = item as Partial<ImportedQuestionJson>
+    if (!raw.question?.trim()) {
+      throw new Error(`Question ${index + 1}: l’énoncé "question" est obligatoire.`)
+    }
+    if (!Array.isArray(raw.options) || raw.options.length < 2 || raw.options.length > 6) {
+      throw new Error(`Question ${index + 1}: fournit entre 2 et 6 options.`)
+    }
+
+    const options = raw.options.map((option, optionIndex) => {
+      if (typeof option === 'string') {
+        return {
+          id: makeId(`O${optionIndex + 1}`),
+          text: option,
+          isCorrect: false,
+        }
+      }
+      if (!option.text?.trim()) {
+        throw new Error(`Question ${index + 1}, option ${optionIndex + 1}: le texte est obligatoire.`)
+      }
+      return {
+        id: makeId(`O${optionIndex + 1}`),
+        text: option.text.trim(),
+        isCorrect: Boolean(option.isCorrect),
+      }
+    })
+
+    const correctCount = options.filter((option) => option.isCorrect).length
+    const type = raw.type === 'multiple'
+      ? 'multiple'
+      : 'single'
+    if (correctCount === 0) {
+      throw new Error(`Question ${index + 1}: aucune bonne réponse n’est indiquée.`)
+    }
+    if (type === 'single' && correctCount !== 1) {
+      throw new Error(`Question ${index + 1}: une seule bonne réponse est requise pour le choix unique.`)
+    }
+
+    return {
+      id: makeId(`Q${index + 1}`),
+      text: raw.question.trim(),
+      type,
+      options,
+      explanation: raw.explanation?.trim() ?? '',
+      points: typeof raw.points === 'number' && raw.points >= 0 ? raw.points : 1,
+    }
+  })
 }
 
 function createQuestion(index = 1): TeacherQuestion {
@@ -125,7 +202,31 @@ export function CreateExam() {
   const [draggedQuestion, setDraggedQuestion] = useState<string | null>(null)
   const [publishedExam, setPublishedExam] = useState<TeacherExam | null>(null)
   const [copyMessage, setCopyMessage] = useState('')
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [qrExpanded, setQrExpanded] = useState(false)
+  const [importError, setImportError] = useState('')
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [jsonText, setJsonText] = useState('')
   const reduceMotion = useReducedMotion()
+
+  useEffect(() => {
+    if (!publishedExam?.accessCode) {
+      setQrDataUrl('')
+      return
+    }
+    const examLink = `${window.location.origin}/student/join?code=${publishedExam.accessCode}`
+    void QRCode.toDataURL(examLink, {
+      width: 320,
+      margin: 2,
+      color: {
+        dark: '#172B4D',
+        light: '#FFFFFF',
+      },
+    }).then(setQrDataUrl).catch((error) => {
+      console.error('Impossible de générer le QR code.', error)
+      setQrDataUrl('')
+    })
+  }, [publishedExam])
 
   const hasDeis = targets.includes(ENGLISH_PROGRAM_ID)
   const otherTargets = targets.filter((id) => id !== ENGLISH_PROGRAM_ID)
@@ -177,6 +278,73 @@ export function CreateExam() {
     setTargets(nextTargets)
     setLanguage(nextTargets.includes(ENGLISH_PROGRAM_ID) ? 'en' : 'fr')
     setError('')
+  }
+
+  function importJsonText() {
+    setImportError('')
+    if (!jsonText.trim()) {
+      setImportError('Collez ou saisissez du JSON avant d’importer.')
+      return
+    }
+    try {
+      const parsed = JSON.parse(jsonText)
+      const imported = parseImportedQuestions(parsed)
+      setQuestions(imported)
+      persistDraft({ questions: imported })
+      setImportModalOpen(false)
+      setJsonText('')
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Le JSON est invalide.')
+    }
+  }
+
+  function exportPdf() {
+    const document = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = document.internal.pageSize.getWidth()
+    const margin = 44
+    let y = 48
+
+    document.setFont('helvetica', 'bold')
+    document.setFontSize(18)
+    document.text(title || 'Examen sans titre', margin, y)
+    y += 28
+
+    document.setFont('helvetica', 'normal')
+    document.setFontSize(11)
+    document.text(`Matière : ${subject || 'Non renseignée'}`, margin, y)
+    y += 18
+    document.text(`Durée : ${duration || '0'} minutes`, margin, y)
+    y += 18
+    document.text(`Date : ${date} à ${openTime}`, margin, y)
+    y += 30
+
+    questions.forEach((question, questionIndex) => {
+      const heading = `${questionIndex + 1}. ${question.text}`
+      const headingLines = document.splitTextToSize(heading, pageWidth - (margin * 2))
+      if (y + (headingLines.length * 14) > document.internal.pageSize.getHeight() - 44) {
+        document.addPage()
+        y = 44
+      }
+      document.setFont('helvetica', 'bold')
+      document.setFontSize(11)
+      document.text(headingLines, margin, y)
+      y += headingLines.length * 14 + 8
+
+      document.setFont('helvetica', 'normal')
+      question.options.forEach((option, optionIndex) => {
+        const optionText = `${String.fromCharCode(65 + optionIndex)}. ${option.text}`
+        const optionLines = document.splitTextToSize(optionText, pageWidth - (margin * 2) - 12)
+        if (y + (optionLines.length * 13) > document.internal.pageSize.getHeight() - 44) {
+          document.addPage()
+          y = 44
+        }
+        document.text(optionLines, margin + 12, y)
+        y += optionLines.length * 13 + 4
+      })
+      y += 12
+    })
+
+    document.save(`evalia-${(title || 'examen').toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}.pdf`)
   }
 
   function toggleTarget(id: string) {
@@ -399,9 +567,46 @@ export function CreateExam() {
             ))}
           </div>
           <p className="mt-3 text-sm text-muted">Le code a été généré de façon unique. Communique-le uniquement aux étudiants concernés.</p>
+          {qrDataUrl && (
+            <div className="mx-auto mt-6 max-w-sm rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+              <div className="flex items-center justify-center gap-2 text-sm font-bold text-ink">
+                <QrCode className="h-4 w-4 text-primary" />
+                QR code d’accès étudiant
+              </div>
+              <img
+                src={qrDataUrl}
+                alt={`QR code pour rejoindre l’examen ${publishedExam.title}`}
+                className="mx-auto mt-4 h-52 w-52 rounded-xl border border-white bg-white p-2 shadow-sm"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<QrCode className="h-4 w-4" />}
+                onClick={() => setQrExpanded(true)}
+                className="mt-4"
+              >
+                Agrandir le QR code
+              </Button>
+              <p className="mt-3 break-all text-xs text-muted">{examLink}</p>
+            </div>
+          )}
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Button icon={copyMessage === 'Le code copié.' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} onClick={() => copyText(publishedExam.accessCode ?? '', 'Le code')}>Copier le code</Button>
             <Button variant="secondary" icon={copyMessage === 'Le lien copié.' ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />} onClick={() => copyText(examLink, 'Le lien')}>Copier le lien</Button>
+            {qrDataUrl && (
+              <Button
+                variant="secondary"
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => {
+                  const link = document.createElement('a')
+                  link.href = qrDataUrl
+                  link.download = `evalia-${publishedExam.accessCode ?? 'examen'}.png`
+                  link.click()
+                }}
+              >
+                Télécharger le QR
+              </Button>
+            )}
           </div>
           {copyMessage && <p role="status" className="mt-3 text-xs font-medium text-muted">{copyMessage}</p>}
           <div className="mt-7 border-t border-line pt-5 text-left">
@@ -420,6 +625,60 @@ export function CreateExam() {
             <Button onClick={() => navigate('/teacher/exams')}>Voir mes examens</Button>
           </div>
         </Card>
+        <Modal
+          open={qrExpanded}
+          onClose={() => setQrExpanded(false)}
+          title="Accès à l’examen"
+          description={publishedExam.title}
+          size="lg"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                icon={<Copy className="h-4 w-4" />}
+                onClick={() => copyText(publishedExam.accessCode ?? '', 'Le code')}
+              >
+                Copier le code
+              </Button>
+              {qrDataUrl && (
+                <Button
+                  icon={<Download className="h-4 w-4" />}
+                  onClick={() => {
+                    const link = document.createElement('a')
+                    link.href = qrDataUrl
+                    link.download = `evalia-${publishedExam.accessCode ?? 'examen'}.png`
+                    link.click()
+                  }}
+                >
+                  Télécharger
+                </Button>
+              )}
+            </>
+          }
+        >
+          <div className="flex flex-col items-center text-center">
+            {qrDataUrl && (
+              <img
+                src={qrDataUrl}
+                alt={`QR code agrandi pour ${publishedExam.title}`}
+                className="h-[min(55vh,420px)] w-[min(55vh,420px)] max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-md"
+              />
+            )}
+            <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-muted">
+              Code d’accès
+            </p>
+            <div className="mt-3 flex justify-center gap-2" aria-label={`Code ${publishedExam.accessCode?.split('').join(' ')}`}>
+              {Array.from(publishedExam.accessCode ?? '').map((character, index) => (
+                <span
+                  key={`${character}-${index}`}
+                  className="flex h-14 w-11 items-center justify-center rounded-xl border border-primary-100 bg-primary-50 font-mono text-2xl font-extrabold text-primary sm:h-16 sm:w-14 sm:text-3xl"
+                >
+                  {character}
+                </span>
+              ))}
+            </div>
+          </div>
+        </Modal>
       </section>
     )
   }
@@ -570,8 +829,33 @@ export function CreateExam() {
                 <h2 id="exam-questions-title" className="text-lg font-bold text-ink">3. Questions de l’examen</h2>
                 <p className="mt-1 text-sm text-muted">Choisis le type de réponse et coche la ou les bonnes réponses.</p>
               </div>
-              <Button variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setQuestions((current) => [...current, createQuestion(current.length + 1)])}>Ajouter une question</Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  icon={<Upload className="h-4 w-4" />}
+                  onClick={() => {
+                    setImportError('')
+                    setImportModalOpen(true)
+                  }}
+                >
+                  Importer JSON
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={<Download className="h-4 w-4" />}
+                  onClick={exportPdf}
+                  disabled={questions.length === 0}
+                >
+                  Exporter PDF
+                </Button>
+                <Button variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setQuestions((current) => [...current, createQuestion(current.length + 1)])}>Ajouter une question</Button>
+              </div>
             </div>
+            {importError && (
+              <p role="alert" className="mt-4 rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
+                {importError}
+              </p>
+            )}
 
             {questions.length === 0 ? (
               <div className="mt-5 rounded-xl border border-dashed border-line p-8 text-center">
@@ -696,6 +980,52 @@ export function CreateExam() {
             </div>
           </section>
         )}
+
+        <Modal
+          open={importModalOpen}
+          onClose={() => {
+            setImportModalOpen(false)
+            setImportError('')
+          }}
+          title="Importer des questions JSON"
+          description="Collez votre JSON. Les questions remplaceront la liste actuelle."
+          size="lg"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setImportModalOpen(false)
+                  setImportError('')
+                }}
+              >
+                Annuler
+              </Button>
+              <Button icon={<Upload className="h-4 w-4" />} onClick={importJsonText}>
+                Importer les questions
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <textarea
+              value={jsonText}
+              onChange={(event) => {
+                setJsonText(event.target.value)
+                setImportError('')
+              }}
+              rows={16}
+              spellCheck={false}
+              placeholder={'{\n  "questions": [\n    {\n      "question": "Votre question ?",\n      "type": "single",\n      "options": [\n        { "text": "Réponse correcte", "isCorrect": true },\n        { "text": "Autre réponse", "isCorrect": false }\n      ],\n      "explanation": "Explication facultative",\n      "points": 1\n    }\n  ]\n}'}
+              className="min-h-72 w-full resize-y rounded-xl border border-slate-200 bg-slate-950 px-4 py-3 font-mono text-xs leading-5 text-slate-100 outline-none placeholder:text-slate-500 focus:border-primary focus:ring-4 focus:ring-primary/10"
+            />
+            {importError && (
+              <p role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
+                {importError}
+              </p>
+            )}
+          </div>
+        </Modal>
 
         {step === 3 && (
           <section aria-labelledby="exam-summary-title">
